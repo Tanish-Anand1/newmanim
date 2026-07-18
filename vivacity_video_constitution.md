@@ -5,43 +5,34 @@ Referenced by script generation, template planning, craft planning, and legacy c
 
 ---
 
-## §1 Layout
+## §1 Layout Engine Architectural Rules
 
-### §1.1 Persistent split-screen (anchor / equation zones)
+### §1.1 Rigid Multi-Zone Split
+- Divide the screen viewport into an upper 45% "Text Safe-Zone" and a lower 55% "Geometric/Physics Workspace" (especially in Portrait mode).
+- The origin of your coordinate tracking grid or 3D axes must be shifted downward into the absolute center of the lower workspace. Never let the camera default to the screen origin (0,0,0) if it causes mathematical geometry to cross into the upper text field.
+- **Landscape partitioning**:
+  - **Anchor zone** (graph/diagram): left half of the frame.
+  - **Equation zone**: right half of the frame.
+  - Keep the diagram visible in the anchor/geometric zone; confine all equation work to the equation/safe-zone.
 
-When a graph or diagram is introduced and equations are derived from it in later beats:
+### §1.2 Zero Absolute Text Coordinates
+- Completely ban the use of hardcoded coordinates or manual spatial offsets (e.g., `UP * 2.5`) for text arrangement. 
+- All text blocks—including titles, subtitles, live variable readouts, and mathematical formulas—must be compiled inside a single parent `VGroup`.
 
-- Do **not** `FadeOut` the diagram to make room for equations.
-- Partition the frame at the start of the sequence:
-  - **Portrait partitioning**:
-    - **Upper 45% (UP * 1.5 to UP * 3.0)**: Designated Math & Text Safe-Zone. All formulas, titles, and step-by-step evaluations must stay here.
-    - **Lower 55% (DOWN * 0.5 to DOWN * 3.0)**: Designated Geometric Workspace. All Axes, coordinate grids, vectors, and graphs must be locked here.
-  - **Landscape partitioning**:
-    - **Anchor zone** (graph/diagram): left half of the frame.
-    - **Equation zone**: right half of the frame.
-- Keep the diagram visible in the anchor/geometric zone; confine all equation work to the equation/safe-zone.
-- Equations morph via `ReplacementTransform` in the equation zone while the diagram stays visible.
-- Remove the diagram only when transitioning to a completely different section.
+### §1.3 Dynamic Relative Stacking
+- Arrange elements within the parent text block strictly using relative alignment methods (such as `.next_to()` with an explicit buffer direction or `VGroup.arrange()`).
+- Enforce a minimum safety padding buffer of 0.4 units between adjacent text elements.
+- When text values or formula terms update dynamically mid-scene, trigger an explicit layout update function to recalculate the entire block's bounding boxes. This ensures elements automatically scale or shift to accommodate length changes without overlapping neighboring text layers.
 
-### §1.2 Portrait padding
+### §1.4 Explicit Z-Index and Separation
+- If utilizing 3D objects or trails, restrict their maximum bounding boxes so they mathematically cannot clip the boundaries of the text safe-zone.
+- Group text and background overlays on a higher rendering layer than geometric plots to guarantee absolute readability. (For ThreeDScene, use `add_fixed_in_frame_mobjects()` for text).
 
-For portrait (1080×1920):
-
-- Headers/titles: `.to_edge(UP, buff=0.5)` minimum from top.
-- At least 0.4 units clearance below headers before content.
-- Use slightly more generous spacing than landscape — narrow width makes tight layouts feel cramped.
-
-### §1.3 Swap rule (recall checkpoint placement)
-
+### §1.5 Swap rule (recall checkpoint placement)
 The `[RECALL_CHECKPOINT]` pause screen is **not** a full-frame interstitial. It continues the same persistent layout:
-
 - Place the new-instance numbers **where the STEP 1 example numbers were** in the equation zone.
-- Render "Pause and try this" + countdown timer in the anchor zone (or above the equation zone if no diagram).
+- Render "Pause and try this" + countdown timer in the geometric zone (or above the equation zone if no diagram).
 - After the pause, reveal the worked solution in the equation zone using the same concrete-first pacing as the main lesson.
-
-### §1.4 Action-title caption clearance
-
-Short action captions ("Solve for the center", "Set up the area") must sit above the equation zone with guaranteed clearance — use `.next_to(equation_zone, UP, buff=0.3)` or equivalent. Never overlap fractions or exponents.
 
 ---
 
@@ -87,7 +78,7 @@ Short action captions ("Solve for the center", "Set up the area") must sit above
 - Call `avoid_overlap()` after placing every `Text`, `Tex`, or `MathTex` mobject.
 - Minimum **0.3** Manim units buffer between simultaneously visible mobjects.
 - **Object scaling**: Never allow long text lines. Scale all multi-term equations (fractions, matrices, summations) downward using `.scale(0.75)` or `.scale(0.8)` to prevent edge clipping.
-- **Spacing buffers**: Always utilize strict vertical layout tracking. Use `VGroup` with an explicit vertical buffer (`buff=0.35` to `0.45`) or pin text explicitly to edges using `to_edge(UP, buff=0.5)`.
+- **Spacing buffers**: As mandated in §1.3, always utilize strict relative layout stacking (e.g. `VGroup.arrange(DOWN, buff=0.4)`). Ban the use of absolute spacing like `UP * 2`.
 
 ---
 
