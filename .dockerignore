@@ -1,0 +1,16 @@
+.env
+.env.production
+.git
+.pytest_cache
+__pycache__
+*.pyc
+*.log
+*.db
+frontend
+job_runs
+learning_memory
+manim-env
+media
+outputs
+vivacity_job_runs
+data

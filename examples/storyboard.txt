@@ -1,0 +1,4 @@
+# Approach: definition first, then geometric intuition, then examples
+[0-4] ON SCREEN: Title "Conic Sections" fades in | VO: "Every conic comes from slicing a cone."
+[4-10] ON SCREEN: A cone appears and a plane creates a circle, ellipse, parabola, then hyperbola | VO: "Changing the slice angle creates a different curve."
+[10-16] ON SCREEN: An ellipse appears with foci F1 and F2 and a point P on the curve | VO: "For an ellipse, the sum of the distances from P to the two foci stays constant."

@@ -1,0 +1,207 @@
+{
+  "main": {
+    "id": "675488da27722623",
+    "type": "split",
+    "children": [
+      {
+        "id": "8992e206b297a1b9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "38f7f9087034779b",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "e0d9b0ae7868d0c3",
+    "type": "split",
+    "children": [
+      {
+        "id": "0df9a743b0762572",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c17836f1ab57664c",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "772c7c262da3f47a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "0ad09770c7c56c67",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "right": {
+    "id": "3fbcfa560d27540d",
+    "type": "split",
+    "children": [
+      {
+        "id": "446be17ae6103424",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3d425c51667327e5",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "6f1a4bcf0a505627",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "3823f1aff836b849",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "b1f2f19e3cb2d646",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "8fa3332d668a5758",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "38f7f9087034779b",
+  "lastOpenFiles": [
+    "vivacity.db-journal",
+    "media/texts/61d539181ae76313_.svg",
+    "outputs/7daef1a4-c4a0-4a07-9137-89e3e4f8542a_TaylorPreciseAxisClearanceV11_FINAL.mp4",
+    "media/texts/27d43149499695f1.svg",
+    "media/texts/8009ec0d2c782128.svg",
+    "media/texts/5bc8e56a17ccc51d.svg",
+    "media/texts/bf508377f499e288.svg",
+    "media/texts/a3e09024848373be.svg",
+    "media/texts/8111f083ef41392f.svg",
+    "media/videos/1920p30/partial_movie_files/NumericGraphTitleClearanceScene",
+    "media/videos/1920p30/partial_movie_files",
+    "media/videos/1920p30",
+    "media/images",
+    "outputs/edd1e9c1-43d2-46b5-be33-9791dfc01a2e_beat_13.png",
+    "outputs/edd1e9c1-43d2-46b5-be33-9791dfc01a2e_beat_12.png",
+    "outputs/edd1e9c1-43d2-46b5-be33-9791dfc01a2e_beat_11.png",
+    "outputs/edd1e9c1-43d2-46b5-be33-9791dfc01a2e_ExplainAndDiagramVSEPRTheoryUsingNHTrigonalPyramidalAndCHTetrahedralAsExamplesShowTheCentr_FINAL.mp4",
+    "outputs/6e9b62e6-5d9e-4ecb-a7bc-751e3d4c2b0d_TaylorGraphTitleClearanceV10_FINAL.mp4",
+    "media/Tex/d737df2e23669814.tex",
+    "media/Tex/7040dd7a713fda93.tex",
+    "frontend/node_modules/next/dist/docs/01-app/04-glossary.md",
+    "frontend/node_modules/next/dist/docs/01-app/02-guides/production-checklist.md",
+    "frontend/node_modules/@img/colour/LICENSE.md",
+    "README.md"
+  ]
+}

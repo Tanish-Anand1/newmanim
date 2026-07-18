@@ -1,0 +1,661 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║           COMPLETE LIST OF ALL MANIM ANIMATIONS (from manim-master source)      ║
+║                    Extracted directly from manimlib/animation/                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+Total: 82 animation classes across 14 categories
+Source: manimlib/animation/ + manimlib/mobject/svg/drawings.py
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 1 — BASE / CORE ANIMATION
+  File: manimlib/animation/animation.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1.  Animation
+    - The root base class for ALL animations in Manim.
+    - Every other animation inherits from this.
+    - Takes a Mobject and animates it over a run_time with a rate_func (easing).
+    - Supports: time_span, lag_ratio, remover, suspend_mobject_updating flags.
+    - By itself it does nothing visible — subclasses implement interpolate_submobject().
+    - Usage: self.play(Animation(mob))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 2 — COMPOSITION (running multiple animations together)
+  File: manimlib/animation/composition.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2.  AnimationGroup
+    - Runs multiple animations simultaneously (or with a lag_ratio offset).
+    - All child animations play together inside one self.play() call.
+    - lag_ratio=0 means all start at once; lag_ratio=1 means each starts after the previous ends.
+    - Automatically groups all mobjects into a VGroup or Group.
+    - Usage: self.play(AnimationGroup(FadeIn(a), FadeIn(b), lag_ratio=0.2))
+
+3.  Succession
+    - Plays animations one after another in strict sequence (lag_ratio=1.0 forced).
+    - Each animation begins only after the previous one fully finishes.
+    - More efficient than chaining multiple self.play() calls.
+    - Usage: self.play(Succession(ShowCreation(sq), FadeOut(sq)))
+
+4.  LaggedStart
+    - Like AnimationGroup but with a small built-in lag_ratio (default 0.05).
+    - Creates a "cascade" or "ripple" effect across a group of animations.
+    - Ideal for animating lists, arrays, or sets of similar objects.
+    - Usage: self.play(LaggedStart(*[FadeIn(m) for m in mob_list]))
+
+5.  LaggedStartMap
+    - Applies a given animation function to every submobject in a group with a lag.
+    - Avoids manually writing a list comprehension — just pass the anim class + group.
+    - Usage: self.play(LaggedStartMap(FadeIn, my_group, lag_ratio=0.1))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 3 — CREATION (drawing / writing objects onto the screen)
+  File: manimlib/animation/creation.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6.  ShowPartial  [ABSTRACT — do not use directly]
+    - Abstract base for animations that reveal a partial stroke of a VMobject.
+    - Subclasses must implement get_bounds(alpha) -> (lower, upper) tuple.
+    - Foundation for ShowCreation and ShowPassingFlash.
+
+7.  ShowCreation
+    - Draws a shape's stroke progressively from start to end, as if a pen is tracing it.
+    - Works on any VMobject: circles, lines, polygons, text, etc.
+    - lag_ratio=1.0 by default so submobjects appear one at a time.
+    - Usage: self.play(ShowCreation(circle))
+
+8.  Uncreate
+    - The reverse of ShowCreation — erases a shape's stroke from end back to start.
+    - Removes the mobject from the scene when done (remover=True by default).
+    - Usage: self.play(Uncreate(circle))
+
+9.  DrawBorderThenFill
+    - Two-phase creation: first draws the outline/border stroke, then fills in the color.
+    - Uses double_smooth rate_func to give a satisfying two-step feel.
+    - Configurable: stroke_width, stroke_color, separate animation configs for each phase.
+    - Usage: self.play(DrawBorderThenFill(square))
+
+10. Write
+    - Specialized version of DrawBorderThenFill tuned for text/math objects.
+    - Automatically adjusts run_time and lag_ratio based on the number of characters.
+    - Uses the stroke color of the text itself for the border phase.
+    - Usage: self.play(Write(text_mob))
+
+11. ShowIncreasingSubsets
+    - Progressively reveals submobjects of a group one by one (or fractionally).
+    - At alpha=0.5, half the submobjects are visible; at alpha=1, all are shown.
+    - Uses int_func (default: np.round) to determine how many to show at each frame.
+    - Usage: self.play(ShowIncreasingSubsets(dot_group))
+
+12. ShowSubmobjectsOneByOne
+    - Like ShowIncreasingSubsets but shows exactly ONE submobject at a time (not cumulative).
+    - At any frame, only the currently "active" submobject is visible.
+    - Usage: self.play(ShowSubmobjectsOneByOne(icon_group))
+
+13. AddTextWordByWord
+    - Reveals a StringMobject (text) one word at a time.
+    - Internally groups the text into words and applies ShowIncreasingSubsets.
+    - time_per_word controls the pacing (default 0.2 seconds per word).
+    - Usage: self.play(AddTextWordByWord(sentence))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 4 — FADING (opacity-based appear/disappear effects)
+  File: manimlib/animation/fading.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+14. Fade  [BASE CLASS]
+    - Base class for FadeIn and FadeOut.
+    - Accepts shift (direction vector) and scale (size multiplier) parameters.
+    - The shift and scale create movement/size effects alongside the opacity change.
+
+15. FadeIn
+    - Fades a mobject from fully transparent (opacity=0) to fully visible.
+    - Optional shift: object can drift in from a direction as it appears.
+    - Optional scale: object can grow from a smaller size as it fades in.
+    - Usage: self.play(FadeIn(mob, shift=UP))
+
+16. FadeOut
+    - Fades a mobject from visible to fully transparent, then removes it from scene.
+    - Optional shift: object drifts away in a direction as it disappears.
+    - Optional scale: object shrinks or grows as it fades out.
+    - Usage: self.play(FadeOut(mob, shift=DOWN))
+
+17. FadeInFromPoint
+    - Fades in a mobject from a single specific point in space.
+    - The object appears to "expand outward" from a dot at the given point.
+    - Uses infinite scale (scale=np.inf) to start, creating a point-source effect.
+    - Usage: self.play(FadeInFromPoint(mob, point=ORIGIN))
+
+18. FadeOutToPoint
+    - Fades out a mobject while collapsing it toward a single specific point.
+    - The object shrinks to a dot at the target point as it disappears.
+    - Reverse of FadeInFromPoint.
+    - Usage: self.play(FadeOutToPoint(mob, point=mob.get_bottom()))
+
+19. FadeTransform
+    - Cross-fades from one mobject to another (morph via opacity).
+    - Source fades out while target fades in; can stretch/match by dimension.
+    - More visually smooth than a hard Transform for dissimilar shapes.
+    - Usage: self.play(FadeTransform(mob_a, mob_b))
+
+20. FadeTransformPieces
+    - Like FadeTransform but aligns and cross-fades individual submobject families.
+    - Each piece of the source fades into the corresponding piece of the target.
+    - Best for text/formula transitions where individual characters should match.
+    - Usage: self.play(FadeTransformPieces(text_a, text_b))
+
+21. VFadeIn
+    - Fades in a VMobject by animating its stroke and fill opacities directly.
+    - Only works on VMobjects (not generic Mobjects).
+    - More control than FadeIn for vector objects with separate stroke/fill.
+    - Usage: self.play(VFadeIn(vobj))
+
+22. VFadeOut
+    - Reverse of VFadeIn — fades out a VMobject via stroke and fill opacity animation.
+    - Removes the object from scene when done.
+    - Usage: self.play(VFadeOut(vobj))
+
+23. VFadeInThenOut
+    - Fades a VMobject in, then immediately fades it back out in one animation.
+    - Uses there_and_back rate function (opacity goes 0→1→0 in a single play call).
+    - Great for brief highlights or acknowledgments.
+    - Usage: self.play(VFadeInThenOut(label))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 5 — GROWING (objects appearing by scaling up from a point/edge)
+  File: manimlib/animation/growing.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+24. GrowFromPoint
+    - Grows a mobject from scale=0 at a specified (x, y, z) point to its full size.
+    - The object appears to "pop" or "emerge" from that exact point in space.
+    - Optional point_color changes the starting color of the tiny dot.
+    - Usage: self.play(GrowFromPoint(mob, point=LEFT * 3))
+
+25. GrowFromCenter
+    - Grows a mobject from scale=0 at its own center to full size.
+    - The most common "appear from nothing" effect for shapes.
+    - Usage: self.play(GrowFromCenter(circle))
+
+26. GrowFromEdge
+    - Grows a mobject from scale=0 starting at one of its edges (UP, DOWN, LEFT, RIGHT).
+    - Useful for bar charts, arrows growing from a wall, etc.
+    - Usage: self.play(GrowFromEdge(rectangle, edge=DOWN))
+
+27. GrowArrow
+    - Specialized grow animation for Arrow objects — grows from the arrow's start/tail.
+    - The arrow appears to extend outward from its base point.
+    - Usage: self.play(GrowArrow(arrow))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 6 — INDICATION (attention-grabbing highlight effects)
+  File: manimlib/animation/indication.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+28. FocusOn
+    - Shrinks a large semi-transparent grey disk from full-screen size to a dot at the target.
+    - Draws the viewer's eye to a specific point on screen.
+    - The "focus point" can be any coordinate or mobject (it tracks updaters).
+    - Usage: self.play(FocusOn(target_point))
+
+29. Indicate
+    - Briefly scales up and changes color of a mobject, then returns it to normal.
+    - Uses there_and_back rate function: scale goes 1→1.2→1 and color changes then reverts.
+    - Non-destructive — the mobject is unchanged after the animation.
+    - Usage: self.play(Indicate(equation_part))
+
+30. Flash
+    - Emits a burst of radial lines from a point, like a starburst or sparkle effect.
+    - Creates num_lines Line objects arranged in a circle, each ShowCreation+Destroyed.
+    - Configurable: color, line_length, num_lines, flash_radius, line_stroke_width.
+    - Usage: self.play(Flash(dot.get_center(), color=YELLOW))
+
+31. CircleIndicate
+    - Draws a yellow circle that briefly surrounds the target mobject, then disappears.
+    - The circle pulses: scales down from slightly larger, then vanishes.
+    - Great for pointing out a specific element without moving it.
+    - Usage: self.play(CircleIndicate(variable_name))
+
+32. ShowPassingFlash
+    - A "light sweep" that travels along the stroke of a VMobject.
+    - Only a small time_width portion of the stroke is visible at any moment.
+    - Removes the mobject at the end (remover=True by default).
+    - Usage: self.play(ShowPassingFlash(circle.copy()))
+
+33. VShowPassingFlash
+    - Advanced version of ShowPassingFlash using Gaussian stroke-width modulation.
+    - Stroke width varies as a smooth Gaussian bell curve traveling along the path.
+    - Creates a more organic, tapered "glow" effect compared to ShowPassingFlash.
+    - Usage: self.play(VShowPassingFlash(vmob, time_width=0.3))
+
+34. FlashAround
+    - Runs VShowPassingFlash along a SurroundingRectangle around the target mobject.
+    - A glowing line sweeps around a box that surrounds the given object.
+    - Usage: self.play(FlashAround(my_label))
+
+35. FlashUnder
+    - Like FlashAround but uses an Underline instead of a surrounding rectangle.
+    - A glowing underline sweep appears beneath the target text/object.
+    - Usage: self.play(FlashUnder(theorem_title))
+
+36. ShowCreationThenDestruction
+    - Draws the full stroke of a VMobject, then immediately erases it.
+    - A passing highlight — object appears fully then disappears (time_width=2.0).
+    - Usage: self.play(ShowCreationThenDestruction(path))
+
+37. ShowCreationThenFadeOut
+    - ShowCreation followed by FadeOut in one Succession.
+    - The object is drawn, then fades to transparent and is removed.
+    - Usage: self.play(ShowCreationThenFadeOut(annotation))
+
+38. AnimationOnSurroundingRectangle  [BASE CLASS]
+    - Base class for animations applied to a SurroundingRectangle around a mobject.
+    - Automatically creates the rect and applies a RectAnimationType to it.
+    - Subclasses override RectAnimationType to pick the specific animation.
+
+39. ShowPassingFlashAround
+    - Runs ShowPassingFlash on a SurroundingRectangle around the target mobject.
+    - A light sweeps around the bounding box of the object.
+    - Usage: self.play(ShowPassingFlashAround(key_formula))
+
+40. ShowCreationThenDestructionAround
+    - Runs ShowCreationThenDestruction on a SurroundingRectangle.
+    - A box is drawn around the object, then erased.
+    - Usage: self.play(ShowCreationThenDestructionAround(important_term))
+
+41. ShowCreationThenFadeAround
+    - Runs ShowCreationThenFadeOut on a SurroundingRectangle.
+    - A box is drawn around the object, then fades out.
+    - Usage: self.play(ShowCreationThenFadeAround(target))
+
+42. ApplyWave
+    - Applies a traveling sine-wave-like deformation to a mobject.
+    - Points of the mobject are displaced vertically (or in any direction) in a wave.
+    - The wave travels left-to-right across the object's bounding box.
+    - Usage: self.play(ApplyWave(text, direction=UP, amplitude=0.3))
+
+43. WiggleOutThenIn
+    - Simultaneously scales and rotates a mobject back and forth multiple times.
+    - n_wiggles controls how many oscillations occur during the animation.
+    - Both scale and rotation return to their original values at the end.
+    - Usage: self.play(WiggleOutThenIn(label, n_wiggles=4))
+
+44. TurnInsideOut
+    - Reverses the point order of a VMobject's path, flipping it "inside out."
+    - The stroke effectively traces itself in reverse while rotating 90 degrees.
+    - Creates a twisting/inverting visual effect.
+    - Usage: self.play(TurnInsideOut(circle))
+
+45. FlashyFadeIn
+    - Fades in a VMobject while simultaneously running VShowPassingFlash over its outline.
+    - Combines a fill fade-in with a glowing outline sweep for a dramatic entrance.
+    - Usage: self.play(FlashyFadeIn(fancy_shape))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 7 — MOVEMENT (spatial warping and path-based motion)
+  File: manimlib/animation/movement.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+46. Homotopy
+    - The most general spatial animation — applies a custom (x, y, z, t) → (x', y', z') function.
+    - Every point of the mobject is warped according to the provided homotopy function.
+    - Foundation for ApplyWave, ComplexHomotopy, and SmoothedVectorizedHomotopy.
+    - Usage: self.play(Homotopy(my_warp_func, mob))
+
+47. SmoothedVectorizedHomotopy
+    - Same as Homotopy but calls make_smooth=True on the result.
+    - Recomputes Bezier handles after warping for smoother curves.
+    - Better for curve-heavy mobjects that need smooth output.
+    - Usage: self.play(SmoothedVectorizedHomotopy(func, mob))
+
+48. ComplexHomotopy
+    - Applies a complex-number function z(t) → w to the mobject's 2D plane.
+    - The function receives complex coordinates and time, returns new complex coordinates.
+    - Great for visualizing complex analysis transformations (Möbius, etc.).
+    - Usage: self.play(ComplexHomotopy(lambda z, t: z**2 * t, plane))
+
+49. PhaseFlow
+    - Simulates a continuous vector field flow — each point moves according to a velocity function.
+    - Integrates the function over virtual_time to show how points drift under the field.
+    - Used to visualize dynamical systems, ODEs, and phase portraits.
+    - Usage: self.play(PhaseFlow(lambda p: np.array([-p[1], p[0], 0]), vector_field))
+
+50. MoveAlongPath
+    - Moves a mobject along the trajectory of another VMobject (used as a path).
+    - The mobject's center tracks quick_point_from_proportion() of the path.
+    - Great for animating a dot traveling along a curve, orbit, or custom route.
+    - Usage: self.play(MoveAlongPath(dot, bezier_curve))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 8 — NUMBERS (animating numeric counters and decimal displays)
+  File: manimlib/animation/numbers.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+51. ChangingDecimal
+    - Animates a DecimalNumber mobject by calling a user-defined function(alpha) → value.
+    - The displayed number updates every frame according to the function's output.
+    - Most flexible number animation — any formula can drive the value.
+    - Usage: self.play(ChangingDecimal(decimal, lambda a: a * 100))
+
+52. ChangeDecimalToValue
+    - Smoothly interpolates a DecimalNumber from its current value to a target value.
+    - The number visually counts up (or down) to the new value.
+    - Usage: self.play(ChangeDecimalToValue(score_display, 9999))
+
+53. CountInFrom
+    - Counts a DecimalNumber from a source_number up to its current set value.
+    - The number starts at source_number (default 0) and animates to its current value.
+    - Great for "score counting" or odometer-style reveals.
+    - Usage: self.play(CountInFrom(price_label, source_number=0))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 9 — ROTATION (spinning / revolving objects)
+  File: manimlib/animation/rotation.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+54. Rotating
+    - Continuously rotates a mobject by a given angle around a given axis.
+    - Default: full TAU (360°) rotation around the Z-axis (OUT), run_time=5s.
+    - Uses linear rate function by default — constant angular speed.
+    - Can rotate around any 3D axis and any point or edge.
+    - Usage: self.play(Rotating(gear, angle=TAU, about_point=ORIGIN))
+
+55. Rotate
+    - Rotates a mobject by a given angle with a smooth ease-in/ease-out.
+    - Default: PI (180°), run_time=1s, smooth rate function.
+    - Convenience wrapper around Rotating for quick single rotations.
+    - Usage: self.play(Rotate(arrow, angle=PI/2))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 10 — SPECIALIZED (purpose-built complex animations)
+  File: manimlib/animation/specialized.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+56. Broadcast
+    - Emits concentric expanding circles (like a radio tower or ripple effect).
+    - n_circles rings grow from small_radius to big_radius with a staggered lag.
+    - Each circle fades/strokes out as it expands; all are removed at the end.
+    - Usage: self.play(Broadcast(focal_point=dot.get_center(), color=BLUE))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 11 — TRANSFORM (shape/position morphing and method application)
+  File: manimlib/animation/transform.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+57. Transform
+    - The core morphing animation — smoothly transforms one mobject into another.
+    - Interpolates every point between the source and target shapes.
+    - path_arc: if nonzero, points travel along arcs instead of straight lines.
+    - path_func: custom path function for advanced control.
+    - Both mobjects must be "aligned" (same submobject structure); Manim handles this.
+    - Usage: self.play(Transform(square, circle))
+
+58. ReplacementTransform
+    - Like Transform, but the source mobject is replaced by the target in the scene.
+    - After the animation, the scene contains target_mobject (not the original source).
+    - Used when you want the original to be "consumed" by the transformation.
+    - Usage: self.play(ReplacementTransform(old_formula, new_formula))
+
+59. TransformFromCopy
+    - Transforms a copy of the source into the target, leaving the original intact.
+    - The original mobject stays in place; a copy of it morphs into the target.
+    - Usage: self.play(TransformFromCopy(original, target))
+
+60. MoveToTarget
+    - Transforms a mobject to its own .target attribute (set via mob.generate_target()).
+    - Useful pattern: generate_target() → modify mob.target → play MoveToTarget.
+    - Usage: mob.generate_target(); mob.target.shift(RIGHT); self.play(MoveToTarget(mob))
+
+61. _MethodAnimation  [INTERNAL]
+    - Internal subclass of MoveToTarget that stores a list of methods applied.
+    - Used internally by the .animate syntax (mob.animate.method()).
+    - Not intended for direct use.
+
+62. ApplyMethod
+    - Transforms a mobject by applying one of its methods as the target state.
+    - Pass the bound method and its arguments; Manim computes the resulting target.
+    - Usage: self.play(ApplyMethod(mob.shift, RIGHT * 2))
+    - (Note: .animate syntax is preferred in modern Manim usage)
+
+63. ApplyPointwiseFunction
+    - Transforms every point of a mobject by applying a function: point → new_point.
+    - Essentially calls mob.apply_function(func) as the transformation target.
+    - run_time=3.0 by default (longer, since these can be complex).
+    - Usage: self.play(ApplyPointwiseFunction(lambda p: p + np.sin(p[1])*RIGHT, mob))
+
+64. ApplyPointwiseFunctionToCenter
+    - Moves a mobject's center to the output of function(current_center).
+    - The shape itself doesn't warp — only its position is affected by the function.
+    - Usage: self.play(ApplyPointwiseFunctionToCenter(reflect_func, mob))
+
+65. FadeToColor
+    - Animates a mobject's color changing to a new target color.
+    - Convenience wrapper around ApplyMethod(mob.set_color, color).
+    - Usage: self.play(FadeToColor(text, RED))
+
+66. ScaleInPlace
+    - Scales a mobject by a factor around its own center.
+    - Wrapper around ApplyMethod(mob.scale, factor).
+    - Usage: self.play(ScaleInPlace(mob, 2.0))
+
+67. ShrinkToCenter
+    - Scales a mobject down to zero size (scale_factor=0) at its center.
+    - Convenience alias for ScaleInPlace(mob, 0) — the object shrinks to a dot.
+    - Usage: self.play(ShrinkToCenter(mob))
+
+68. Restore
+    - Transforms a mobject back to its previously saved state.
+    - Requires mob.save_state() to have been called before the animation.
+    - Usage: mob.save_state(); ...; self.play(Restore(mob))
+
+69. ApplyFunction
+    - Transforms a mobject by applying an arbitrary function(mobject) → mobject.
+    - The function receives a copy of the mobject, modifies it, and returns it.
+    - More flexible than ApplyMethod — can change multiple properties at once.
+    - Usage: self.play(ApplyFunction(lambda m: m.scale(2).set_color(RED), mob))
+
+70. ApplyMatrix
+    - Applies a 2×2 or 3×3 linear transformation matrix to all points of a mobject.
+    - Uses matrix multiplication to warp the shape (rotation, shear, reflection, etc.).
+    - Usage: self.play(ApplyMatrix([[0,-1],[1,0]], mob))  # 90° rotation matrix
+
+71. ApplyComplexFunction
+    - Applies a complex function f(z, t) → w to the 2D plane of a mobject.
+    - Treats x,y coordinates as the real and imaginary parts of z.
+    - Automatically sets path_arc based on the function's rotation at z=1.
+    - Usage: self.play(ApplyComplexFunction(lambda z: z**2, mob))
+
+72. CyclicReplace
+    - Cyclically swaps positions among multiple mobjects in a circular chain.
+    - Each mobject moves to where the next one was; the last moves to where the first was.
+    - path_arc=90° by default so objects travel along arcs.
+    - Usage: self.play(CyclicReplace(mob_a, mob_b, mob_c))
+
+73. Swap
+    - Alias for CyclicReplace — same behavior with a more intuitive name for 2 objects.
+    - Usage: self.play(Swap(mob_a, mob_b))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 12 — TRANSFORM MATCHING PARTS (smart formula/text morphing)
+  File: manimlib/animation/transform_matching_parts.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+74. TransformMatchingParts
+    - Intelligently transforms one mobject into another by matching identically-shaped pieces.
+    - Matching submobjects (same shape) slide/transform to their counterparts.
+    - Non-matching pieces fade in/out from/to the target/source center.
+    - matched_pairs: manually specify which pieces correspond.
+    - Usage: self.play(TransformMatchingParts(equation1, equation2))
+
+75. TransformMatchingShapes
+    - Exact alias for TransformMatchingParts (different name, identical behavior).
+    - Usage: self.play(TransformMatchingShapes(shape_group_a, shape_group_b))
+
+76. TransformMatchingStrings
+    - Like TransformMatchingParts but uses string-based matching for StringMobjects.
+    - Finds the longest matching substrings between source and target text.
+    - matched_keys and key_map allow manual overrides for specific substrings.
+    - Usage: self.play(TransformMatchingStrings(tex1, tex2))
+
+77. TransformMatchingTex
+    - Alias for TransformMatchingStrings — specifically named for LaTeX (Tex) objects.
+    - Usage: self.play(TransformMatchingTex(formula_a, formula_b))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 13 — UPDATE (function-driven per-frame animations)
+  File: manimlib/animation/update.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+78. UpdateFromFunc
+    - Calls a user function func(mobject) on every frame of the animation.
+    - The function can freely modify the mobject however it wants each frame.
+    - Useful when one mobject's state depends on another animated mobject.
+    - Usage: self.play(UpdateFromFunc(label, lambda m: m.move_to(dot.get_center())))
+
+79. UpdateFromAlphaFunc
+    - Like UpdateFromFunc but passes the current alpha (0 to 1) as second argument.
+    - Function signature: func(mobject, alpha) — alpha lets you drive time-based changes.
+    - Usage: self.play(UpdateFromAlphaFunc(mob, lambda m, a: m.set_opacity(a)))
+
+80. MaintainPositionRelativeTo
+    - Keeps a mobject at a fixed offset relative to another "tracked" mobject.
+    - Every frame, the mobject's position is updated to stay relative to the tracked one.
+    - Used when one object must follow another during a complex animation.
+    - Usage: self.play(MaintainPositionRelativeTo(label, moving_dot))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CATEGORY 14 — DOMAIN-SPECIFIC / SCENE OBJECTS
+  File: manimlib/mobject/svg/drawings.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+81. ClockPassesTime
+    - Rotates the hour and minute hands of a Clock mobject to simulate time passing.
+    - hours_passed controls how many hours the clock "fast-forwards" through.
+    - Both hands rotate at the correct 12:1 speed ratio relative to each other.
+    - Usage: self.play(ClockPassesTime(clock, hours_passed=3))
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BONUS — THE .animate SYNTAX (not a class, but an animation mechanism)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+82. mob.animate  (via _AnimationBuilder in manimlib/mobject/mobject.py)
+    - Any Mobject method can be animated using the .animate builder syntax.
+    - Internally creates a _MethodAnimation (subclass of MoveToTarget).
+    - Captures the method call, applies it to a copy as the target, then transforms.
+    - Examples:
+        self.play(mob.animate.shift(RIGHT))
+        self.play(mob.animate.set_color(BLUE).scale(2))
+        self.play(mob.animate.rotate(PI/4).move_to(ORIGIN))
+    - Chain multiple methods: each one is applied sequentially to build the target state.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QUICK REFERENCE — ALL 82 ANIMATIONS BY CATEGORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BASE:
+  Animation
+
+COMPOSITION:
+  AnimationGroup, Succession, LaggedStart, LaggedStartMap
+
+CREATION:
+  ShowPartial*, ShowCreation, Uncreate, DrawBorderThenFill, Write,
+  ShowIncreasingSubsets, ShowSubmobjectsOneByOne, AddTextWordByWord
+
+FADING:
+  Fade*, FadeIn, FadeOut, FadeInFromPoint, FadeOutToPoint,
+  FadeTransform, FadeTransformPieces, VFadeIn, VFadeOut, VFadeInThenOut
+
+GROWING:
+  GrowFromPoint, GrowFromCenter, GrowFromEdge, GrowArrow
+
+INDICATION:
+  FocusOn, Indicate, Flash, CircleIndicate, ShowPassingFlash,
+  VShowPassingFlash, FlashAround, FlashUnder, ShowCreationThenDestruction,
+  ShowCreationThenFadeOut, AnimationOnSurroundingRectangle*,
+  ShowPassingFlashAround, ShowCreationThenDestructionAround,
+  ShowCreationThenFadeAround, ApplyWave, WiggleOutThenIn,
+  TurnInsideOut, FlashyFadeIn
+
+MOVEMENT:
+  Homotopy, SmoothedVectorizedHomotopy, ComplexHomotopy,
+  PhaseFlow, MoveAlongPath
+
+NUMBERS:
+  ChangingDecimal, ChangeDecimalToValue, CountInFrom
+
+ROTATION:
+  Rotating, Rotate
+
+SPECIALIZED:
+  Broadcast
+
+TRANSFORM:
+  Transform, ReplacementTransform, TransformFromCopy, MoveToTarget,
+  _MethodAnimation*, ApplyMethod, ApplyPointwiseFunction,
+  ApplyPointwiseFunctionToCenter, FadeToColor, ScaleInPlace,
+  ShrinkToCenter, Restore, ApplyFunction, ApplyMatrix,
+  ApplyComplexFunction, CyclicReplace, Swap
+
+TRANSFORM MATCHING:
+  TransformMatchingParts, TransformMatchingShapes, TransformMatchingStrings,
+  TransformMatchingTex
+
+UPDATE:
+  UpdateFromFunc, UpdateFromAlphaFunc, MaintainPositionRelativeTo
+
+DOMAIN-SPECIFIC:
+  ClockPassesTime
+
+BUILDER MECHANISM:
+  mob.animate (via _AnimationBuilder)
+
+* = abstract or internal, not for direct use
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ANIMATION PARAMETERS (shared by all animations)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  run_time         — Duration in seconds (default: 1.0)
+  rate_func        — Easing function: smooth, linear, there_and_back, wiggle, etc.
+  lag_ratio        — Stagger ratio for submobjects (0=simultaneous, 1=sequential)
+  time_span        — (start, end) tuple to run animation within a larger time window
+  remover          — If True, removes mobject from scene after animation ends
+  final_alpha_value — Alpha value used to set final state (default: 1.0)
+  suspend_mobject_updating — If True, pauses the mobject's own updaters during animation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AVAILABLE RATE FUNCTIONS (control animation easing/pacing)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  smooth              — Default S-curve ease in+out (most animations use this)
+  linear              — Constant speed, no easing
+  double_smooth       — Two smooth curves joined (used by DrawBorderThenFill)
+  there_and_back      — Goes from 0→1→0 (for pulsing effects like Indicate)
+  there_and_back_with_pause — Like there_and_back but holds at peak briefly
+  wiggle              — Oscillating back-and-forth (used by WiggleOutThenIn)
+  squish_rate_func    — Restricts a rate function to a sub-interval of [0,1]
+  rush_into           — Fast start, slow finish
+  rush_from           — Slow start, fast finish
+  slow_into           — Eases slowly into final state
+  lingering           — Spends most time at the end value
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SOURCE FILES SCANNED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  manimlib/animation/animation.py              (base)
+  manimlib/animation/composition.py            (AnimationGroup, Succession, LaggedStart*)
+  manimlib/animation/creation.py               (ShowCreation, Write, Draw*)
+  manimlib/animation/fading.py                 (Fade*, VFade*)
+  manimlib/animation/growing.py                (Grow*)
+  manimlib/animation/indication.py             (Flash*, Indicate*, Show*, Apply*, Wiggle*)
+  manimlib/animation/movement.py               (Homotopy*, PhaseFlow, MoveAlongPath)
+  manimlib/animation/numbers.py                (Changing*, CountIn*)
+  manimlib/animation/rotation.py               (Rotating, Rotate)
+  manimlib/animation/specialized.py            (Broadcast)
+  manimlib/animation/transform.py              (Transform*, Apply*, Scale*, Fade*, Shrink*)
+  manimlib/animation/transform_matching_parts.py (TransformMatching*)
+  manimlib/animation/update.py                 (Update*, MaintainPosition*)
+  manimlib/mobject/svg/drawings.py             (ClockPassesTime)
+  manimlib/mobject/mobject.py                  (_AnimationBuilder / .animate)

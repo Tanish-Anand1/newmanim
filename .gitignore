@@ -1,0 +1,44 @@
+# Local configuration and secrets
+.env
+.env.production
+*.env.local
+.env*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+manim-env/
+
+# Runtime state
+*.db
+*.db-shm
+*.db-wal
+*.log
+job_runs/
+media/
+outputs/
+vivacity_job_runs/
+vivacity_cache/
+
+# Frontend
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Extra Render Dirs and logs
+_chaos_render/
+_lorenz_render/
+_qa_frames/
+.runtime_logs/
+runtime_logs/
+logs/
+learning_memory/
+data/

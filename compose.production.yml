@@ -1,0 +1,79 @@
+name: vivacity
+
+x-vivacity-common: &vivacity-common
+  build:
+    context: .
+  env_file:
+    - ${VIVACITY_ENV_FILE:-.env.production}
+  environment:
+    DATABASE_URL: postgresql+psycopg://vivacity:${POSTGRES_PASSWORD}@db:5432/vivacity
+    JOB_EXECUTION_MODE: rq
+    REDIS_URL: redis://redis:6379/0
+    VIVACITY_WORK_ROOT: /var/lib/vivacity/jobs
+    VIVACITY_CACHE_ROOT: /var/lib/vivacity/cache
+    VIVACITY_OUTPUT_DIR: /app/outputs
+    LEARNING_MEMORY_DIR: /var/lib/vivacity/learning
+  volumes:
+    - vivacity-jobs:/var/lib/vivacity/jobs
+    - vivacity-cache:/var/lib/vivacity/cache
+    - vivacity-outputs:/app/outputs
+    - vivacity-learning:/var/lib/vivacity/learning
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  stop_grace_period: 15m
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - vivacity-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-bookworm
+    env_file:
+      - ${VIVACITY_ENV_FILE:-.env.production}
+    environment:
+      POSTGRES_DB: vivacity
+      POSTGRES_USER: vivacity
+    volumes:
+      - vivacity-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vivacity -d vivacity"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *vivacity-common
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    <<: *vivacity-common
+    command: ["python", "-m", "app.rq_worker"]
+
+volumes:
+  vivacity-postgres:
+  vivacity-jobs:
+  vivacity-cache:
+  vivacity-outputs:
+  vivacity-learning:
+  vivacity-redis:
