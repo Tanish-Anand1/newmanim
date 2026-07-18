@@ -1659,21 +1659,18 @@ def compile_template_scene(
             "    return mobj.animate.scale(min(scale_factor, allowed_scale))",
             "",
             "def place_graph_title(title, axes, min_buffer=0.4, min_clearance=0.3):",
+            "    # Dynamic relative stacking per strict architectural rules",
             "    title.next_to(axes, UP, buff=max(0.4, min_buffer))",
-            "    axis_line_y = axes.x_axis.get_center()[1]",
-            "    minimum_title_bottom = axis_line_y + max(0.3, min_clearance)",
-            "    if title.get_bottom()[1] <= minimum_title_bottom:",
-            "        title.shift(UP * (minimum_title_bottom - title.get_bottom()[1] + 0.01))",
             "    return title",
             "",
             "def make_visual(kind, labels, portrait=True):",
             "    if kind == 'axes':",
-            "        axes = Axes(x_range=[-3, 3, 1], y_range=[-2, 2, 1], x_length=4.6, y_length=2.8, tips=False, axis_config={'color': STRUCTURE_COLOR})",
+            "        axes = Axes(x_range=[-3, 3, 1], y_range=[-2, 2, 1], x_length=4.6, y_length=2.8, tips=False, axis_config={'color': STRUCTURE_COLOR}).shift(DOWN * 1.5)",
             "        curve = axes.plot(lambda x: 0.65 * np.sin(1.1 * x), color=PRIMARY_CURVE_COLOR)",
             "        tracer = Dot(curve.get_start(), color=HIGHLIGHT_COLOR)",
             "        return VGroup(axes, curve, tracer)",
             "    if kind == 'taylor_axes':",
-            "        axes = Axes(x_range=[-2.5, 2.5, 1], y_range=[-2, 2, 1], x_length=4.8, y_length=3.0, tips=False, axis_config={'color': STRUCTURE_COLOR})",
+            "        axes = Axes(x_range=[-2.5, 2.5, 1], y_range=[-2, 2, 1], x_length=4.8, y_length=3.0, tips=False, axis_config={'color': STRUCTURE_COLOR}).shift(DOWN * 1.5)",
             "        function_color = REFERENCE_CURVE_COLOR",
             "        linear_color = PRIMARY_CURVE_COLOR",
             "        cubic_color = SECONDARY_CURVE_COLOR",
@@ -1691,6 +1688,7 @@ def compile_template_scene(
             "        return VGroup(axes, function_curve, linear_curve, cubic_curve, legend)",
             "    if kind == 'taylor_error':",
             "        axes = Axes(x_range=[-2.5, 2.5, 1], y_range=[-2, 2, 1], x_length=4.8, y_length=3.0, tips=False, axis_config={'color': STRUCTURE_COLOR})",
+            "        error_color = NEGATIVE_COLOR",
             "        function_curve = axes.plot(lambda x: np.sin(x), color=REFERENCE_CURVE_COLOR)",
             "        cubic_curve = axes.plot(lambda x: x - x**3 / 6, color=SECONDARY_CURVE_COLOR)",
             "        x_values = np.linspace(-2.35, 2.35, 56)",
@@ -2403,8 +2401,8 @@ def compile_template_scene(
                     f"            beat{number}_equation1.scale_to_fit_width(config.frame_width * 0.76)",
                     f"        beat{number}_equation1.move_to({equation_transition_source_variable})",
                     f"        avoid_overlap(beat{number}_equation1, beat{number}_overlap_obstacles, min_gap=0.3)",
-                    f"        beat{number}_heading.move_to(beat{number}_equation1.get_top() + UP * (beat{number}_heading.height / 2 + 0.38))",
-                    f"        avoid_overlap(beat{number}_heading, [beat{number}_equation1], min_gap=0.3)",
+                    f"        beat{number}_text_group = VGroup(beat{number}_heading, beat{number}_equation1).arrange(DOWN, buff=0.4)",
+                    f"        beat{number}_text_group.to_edge(UP, buff=0.5)",
                 ]
             )
         if same_equation_continuation and continuation_source_variable is not None:
@@ -2413,8 +2411,8 @@ def compile_template_scene(
                     # The continuing formula remains the visual anchor. Place
                     # the fresh orienting heading above it without rebuilding
                     # or moving the already-visible equation.
-                    f"        beat{number}_heading.move_to({continuation_source_variable}.get_top() + UP * (beat{number}_heading.height / 2 + 0.38))",
-                    f"        avoid_overlap(beat{number}_heading, [{continuation_source_variable}], min_gap=0.3)",
+                    f"        beat{number}_text_group = VGroup(beat{number}_heading, {continuation_source_variable}).arrange(DOWN, buff=0.4)",
+                    f"        beat{number}_text_group.to_edge(UP, buff=0.5)",
                 ]
             )
         if beat.visual_kind in {"axes", "taylor_axes", "taylor_error"}:
@@ -2422,11 +2420,6 @@ def compile_template_scene(
                 [
                     f"        beat{number}_axes = beat{number}_visual[0]",
                     f"        beat{number}_heading.next_to(beat{number}_axes, UP, buff=0.4)",
-                    f"        avoid_overlap(beat{number}_heading, [beat{number}_visual, beat{number}_axes], min_gap=0.3)",
-                    f"        beat{number}_axis_line_y = beat{number}_axes.x_axis.get_center()[1]",
-                    f"        beat{number}_minimum_title_bottom = beat{number}_axis_line_y + 0.3",
-                    f"        if beat{number}_heading.get_bottom()[1] <= beat{number}_minimum_title_bottom:",
-                    f"            beat{number}_heading.shift(UP * (beat{number}_minimum_title_bottom - beat{number}_heading.get_bottom()[1] + 0.01))",
                     f"        place_graph_title(beat{number}_heading, beat{number}_axes)",
                     f"        beat{number}_diagram.move_to(ORIGIN)",
                 ]

@@ -357,15 +357,12 @@ def introduce_concept(ctx: CraftContext, title: str, text: Optional[str] = None)
     
     group.arrange(DOWN, buff=0.6)
     
-    # Graph-aware layout positioning in portrait mode
-    if "axes" in ctx.graph_elements and ctx.orientation == "portrait":
+    # Graph-aware layout positioning in portrait mode (no absolute offsets)
+    if ctx.orientation == "portrait":
         group.scale_to_fit_width(config.frame_width * 0.85)
-        group.move_to(UP * 2.2)
-    elif ctx.orientation == "portrait":
-        group.scale_to_fit_width(config.frame_width * 0.85)
-        # Safe top margin: keep at least 0.5 units from the frame edge
-        max_y = config.frame_height / 2 - group.height / 2 - 0.5
-        group.move_to(UP * min(3.0, max_y))
+    
+    # Strictly bind text group to frame edge without hardcoded UP values
+    group.to_edge(UP, buff=0.5)
     
     ctx.add_fixed(group)
     
@@ -407,22 +404,25 @@ def transform_equation(ctx: CraftContext, old_eq: str, new_eq: str, heading: Opt
     if eq_new.width > _max_eq_w:
         eq_new.scale_to_fit_width(_max_eq_w)
     
-    # Default position: if graph is active in portrait mode, place above graph
-    if "axes" in ctx.graph_elements and ctx.orientation == "portrait":
-        eq_old.move_to(UP * 1.5)
-        eq_new.move_to(UP * 1.5)
-        
-    ctx.add_fixed(eq_old)
-    ctx.add_fixed(eq_new)
-    
     if heading:
         # Wrap heading to multiple lines if needed and format LaTeX strings
         formatted_heading = wrap_text(format_title_text(heading), max_chars_per_line=18)
         heading_mob = create_mixed_text(formatted_heading, font_size=CRAFT_BODY_FONT_SIZE, color=CRAFT_TEXT_COLOR, weight=BOLD)
-        heading_mob.to_edge(UP, buff=1.4)  # 1.4 keeps bold text away from border
+        heading_mob.to_edge(UP, buff=0.5)
         ctx.add_fixed(heading_mob)
         ctx.scene.play(Write(heading_mob), run_time=0.8)
         ctx.current_heading = heading_mob
+        
+        # Dynamic relative stacking per strict architectural rules
+        eq_old.next_to(heading_mob, DOWN, buff=0.4)
+        eq_new.next_to(heading_mob, DOWN, buff=0.4)
+    else:
+        # Without heading, just anchor to the text safe-zone
+        eq_old.to_edge(UP, buff=0.5)
+        eq_new.to_edge(UP, buff=0.5)
+        
+    ctx.add_fixed(eq_old)
+    ctx.add_fixed(eq_new)
         
     if source_mob:
         # Check if source_mob matches old_eq
