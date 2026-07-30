@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vivacity</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', sans-serif; background: #050505; color: #fff; height: 100vh; overflow: hidden; }
+#app { height: 100vh; display: flex; flex-direction: column; }
+
+.topbar { display: flex; align-items: center; padding: 0 20px; height: 52px; gap: 12px;
+  background: rgba(10,10,10,0.95); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.topbar .brand { font-size: 18px; font-weight: 700; color: #00c3ff; }
+.topbar .status { font-size: 12px; color: rgba(255,255,255,0.35); margin-left: auto; }
+.topbar button { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: #fff; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.topbar button:hover { background: rgba(255,255,255,0.1); }
+.topbar button.primary { background: #00c3ff; color: #000; border-color: #00c3ff; font-weight: 600; }
+.topbar button.primary:hover { opacity: 0.85; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+.sidebar { width: 360px; min-width: 360px; border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column; background: rgba(255,255,255,0.02); }
+.preview { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #000; position: relative; padding: 20px; }
+.preview video { max-height: 85%; max-width: 100%; border-radius: 8px; }
+.preview .empty { color: rgba(255,255,255,0.2); font-size: 14px; text-align: center; line-height: 1.6; }
+
+.chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.msg .avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.msg.user .avatar { background: rgba(0,195,255,0.15); color: #00c3ff; }
+.msg.ai .avatar { background: linear-gradient(135deg,rgba(0,195,255,0.15),rgba(85,0,255,0.15)); color: #a78bfa; }
+.msg .bubble { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.85); max-width: 420px; }
+.msg.user .bubble { background: rgba(0,195,255,0.06); border-color: rgba(0,195,255,0.15); }
+
+.input-area { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column; gap: 8px; }
+.options-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; color: rgba(255,255,255,0.5); }
+.options-row select, .options-row input[type="checkbox"] { background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-family: inherit; }
+.options-row label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.input-box { display: flex; gap: 8px; }
+.input-box textarea { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 13px; font-family: inherit; resize: none;
+  outline: none; min-height: 40px; max-height: 120px; line-height: 1.4; }
+.input-box textarea:focus { border-color: rgba(0,195,255,0.4); }
+.input-box button { background: #00c3ff; border: none; color: #000; border-radius: 8px; padding: 10px 18px;
+  font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.input-box button:hover { opacity: 0.85; }
+.input-box button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.video-actions { display: flex; gap: 8px; margin-top: 12px; }
+.video-actions button { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: #fff; padding: 6px 14px; border-radius: 6px; font-size: 11px; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 5px; }
+.video-actions button:hover { background: rgba(255,255,255,0.1); }
+.video-actions button.accent { border-color: #00c3ff; color: #00c3ff; }
+.video-actions button svg { width: 14px; height: 14px; }
+
+.recall-panel { display: none; margin-top: 14px; padding: 14px; border: 1px solid rgba(0,195,255,0.2);
+  border-radius: 8px; background: rgba(0,195,255,0.04); max-width: 520px; }
+.recall-panel.visible { display: block; }
+.recall-panel .q { font-size: 14px; line-height: 1.5; margin-bottom: 10px; }
+.recall-panel .row { display: flex; gap: 8px; }
+.recall-panel input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px; padding: 8px 12px; color: #fff; font-size: 13px; font-family: inherit; outline: none; }
+.recall-panel input:focus { border-color: rgba(0,195,255,0.4); }
+.recall-panel button { background: #00c3ff; border: none; color: #000; border-radius: 6px; padding: 8px 14px;
+  font-weight: 600; font-size: 12px; cursor: pointer; font-family: inherit; }
+.recall-panel button:disabled { opacity: 0.35; }
+.recall-panel .fb { font-size: 12px; margin-top: 8px; }
+.recall-panel .fb.correct { color: #34d399; }
+.recall-panel .fb.wrong { color: #fb7185; }
+
+.progress { display: none; margin-top: 8px; }
+.progress.visible { display: block; }
+.progress .bar { width: 100%; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+.progress .fill { height: 100%; background: #00c3ff; border-radius: 2px; transition: width 0.5s; }
+.progress .label { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 6px; }
+
+.err { display: none; padding: 10px 14px; background: rgba(255,68,102,0.08); border: 1px solid rgba(255,68,102,0.2);
+  border-radius: 6px; color: #fb7185; font-size: 12px; margin-bottom: 8px; }
+.err.visible { display: block; }
+
+@media (max-width: 700px) { .sidebar { width: 100%; min-width: unset; } .main { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">Vivacity</div>
+    <div class="status" id="statusBar">Ready</div>
+    <button id="editorBtn" onclick="openEditorPage()" style="display:none">✎ Edit Video</button>
+  </div>
+
+  <div class="main">
+    <!-- Sidebar: Chat + Input -->
+    <div class="sidebar">
+      <div class="chat-area">
+        <div class="messages" id="messages">
+          <div class="msg ai">
+            <div class="avatar">V</div>
+            <div class="bubble">Hey! Type a topic below to generate an animated video. Try <strong>"escape velocity derivation"</strong> or <strong>"Taylor series"</strong>.</div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="options-row">
+            <label>Duration
+              <select id="durationSelect">
+                <option value="30">30s</option>
+                <option value="45" selected>45s</option>
+                <option value="60">60s</option>
+                <option value="90">90s</option>
+                <option value="120">120s</option>
+              </select>
+            </label>
+            <label>Format
+              <select id="formatSelect">
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </label>
+            <label><input type="checkbox" id="weakTopic"> Weak topic</label>
+          </div>
+
+          <div class="input-box">
+            <textarea id="chatInput" rows="1" placeholder="Type a topic to generate a video... (e.g. 'escape velocity derivation')"></textarea>
+            <button id="sendBtn" onclick="sendMessage()">Generate</button>
+          </div>
+
+          <div class="err" id="errorDisplay"></div>
+          <div class="progress" id="progressDisplay">
+            <div class="bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
+            <div class="label" id="progressLabel">Starting...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Video Preview -->
+    <div class="preview" id="previewArea">
+      <div class="empty" id="emptyState">
+        <div style="font-size:32px;margin-bottom:8px;">🎬</div>
+        Generate a video to see it here<br>
+        <span style="color:rgba(255,255,255,0.15);font-size:12px;">The video will appear after rendering completes</span>
+      </div>
+      <video id="videoPlayer" controls style="display:none"></video>
+
+      <div class="video-actions" id="videoActions" style="display:none">
+        <button onclick="downloadVideo()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download MP4
+        </button>
+        <button class="accent" id="editorBtn2" onclick="openEditorPage()" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit Video
+        </button>
+      </div>
+    </div>
+
+    <!-- Recall Panel (appears after video completes) -->
+    <div class="recall-panel" id="recallPanel">
+      <div class="q" id="recallQuestion"></div>
+      <div class="row">
+        <input id="recallAnswer" placeholder="Your answer...">
+        <button id="recallSubmit" onclick="submitRecall()">Check</button>
+      </div>
+      <div class="fb" id="recallFeedback"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // same origin
+let currentJobId = null;
+let currentVideoUrl = null;
+let pollTimer = null;
+
+function addMessage(role, text) {
+  const m = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  const avatar = role === 'user' ? 'U' : 'V';
+  d.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${escHtml(text)}</div>`;
+  m.appendChild(d);
+  m.scrollTop = m.scrollHeight;
+}
+
+function escHtml(t) { return String(t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function setStatus(text) { document.getElementById('statusBar').textContent = text; }
+function showError(msg) { const e = document.getElementById('errorDisplay'); e.textContent = msg; e.classList.add('visible'); }
+function hideError() { document.getElementById('errorDisplay').classList.remove('visible'); }
+function showProgress(pct, msg) {
+  document.getElementById('progressDisplay').classList.add('visible');
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = msg;
+}
+function hideProgress() { document.getElementById('progressDisplay').classList.remove('visible'); }
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || document.getElementById('sendBtn').disabled) return;
+  
+  hideError();
+  addMessage('user', text);
+  input.value = '';
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('sendBtn').textContent = 'Generating...';
+  setStatus('Generating storyboard...');
+  
+  // Build storyboard from topic
+  const duration = parseInt(document.getElementById('durationSelect').value) || 45;
+  const fmt = document.getElementById('formatSelect').value;
+  const storyboard = buildStoryboard(text, duration);
+  
+  addMessage('ai', 'Creating your ' + duration + 's video on "' + text + '"...');
+  showProgress(5, 'Submitting job...');
+  
+  try {
+    const res = await fetch(API + '/api/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        storyboard: storyboard,
+        scene_name: 'VivacityGen',
+        orientation: fmt,
+        pipeline_profile: 'template'
+      })
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(e); }
+    const data = await res.json();
+    currentJobId = data.job_id;
+    setStatus('Job: ' + currentJobId.slice(0,8) + '...');
+    pollJob(currentJobId);
+  } catch (err) {
+    showError(err.message);
+    setStatus('Failed');
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('sendBtn').textContent = 'Generate';
+    hideProgress();
+  }
+}
+
+function buildStoryboard(topic, duration) {
+  const words = topic.replace(/[^a-zA-Z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
+  const t = words.slice(0, 5).join(' ') || topic.slice(0, 50);
+  const secsPerBeat = Math.max(5, Math.round(duration / 5));
+  let sb = `# Topic: ${t}\n`;
+  const beats = [
+    `${t} concept with variables`,
+    `Formula KE = half m v squared relation`,
+    `Example with m = 2 and v = 3`,
+    `Graph showing relation between variables`,
+    `Edge case when variable is zero`,
+    `Active recall try different values`
+  ];
+  const numBeats = Math.min(6, Math.max(4, Math.round(duration / secsPerBeat)));
+  for (let i = 0; i < numBeats && i < beats.length; i++) {
+    const start = i * secsPerBeat;
+    const end = (i + 1) * secsPerBeat;
+    sb += `[${start}-${end}] ON SCREEN: ${beats[i]} | VO: "Beat ${i+1} of ${numBeats}."\n`;
+  }
+  return sb;
+}
+
+async function pollJob(jobId) {
+  const maxPolls = 120;
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const res = await fetch(API + '/api/jobs/' + jobId);
+      const job = await res.json();
+      const s = job.status;
+      setStatus(s.charAt(0).toUpperCase() + s.slice(1));
+      
+      if (s === 'rendering' || s === 'generating_code' || s === 'muxing') {
+        const pct = s === 'generating_code' ? 25 : s === 'rendering' ? 60 : 85;
+        showProgress(pct, job.progress_message || s);
+      }
+      
+      if (s === 'complete') {
+        hideProgress();
+        document.getElementById('sendBtn').disabled = false;
+        document.getElementById('sendBtn').textContent = 'Generate';
+        onComplete(job);
+        return;
+      }
+      if (s === 'failed') {
+        hideProgress();
+        document.getElementById('sendBtn').disabled = false;
+        document.getElementById('sendBtn').textContent = 'Generate';
+        showError(job.error || job.failure_code || 'Unknown error');
+        setStatus('Failed');
+        return;
+      }
+    } catch (e) {
+      // retry
+    }
+  }
+}
+
+function onComplete(job) {
+  const videoUrl = job.output_video_url || '';
+  currentVideoUrl = videoUrl;
+  const fullUrl = videoUrl.startsWith('http') ? videoUrl : API + videoUrl;
+  
+  document.getElementById('emptyState').style.display = 'none';
+  const v = document.getElementById('videoPlayer');
+  v.src = fullUrl;
+  v.style.display = 'block';
+  v.load();
+  v.play().catch(() => {});
+  
+  document.getElementById('videoActions').style.display = 'flex';
+  document.getElementById('editorBtn').style.display = 'inline-block';
+  document.getElementById('editorBtn2').style.display = 'inline-block';
+  setStatus('Complete — ' + (job.duration_seconds || '?') + 's');
+  
+  addMessage('ai', '✅ Video ready! ' + (job.duration_seconds || '') + ' seconds.');
+  
+  // Show recall question
+  const rq = job.recall_question;
+  if (rq && rq.question) {
+    document.getElementById('recallQuestion').textContent = rq.question;
+    document.getElementById('recallAnswer').value = '';
+    document.getElementById('recallFeedback').textContent = '';
+    document.getElementById('recallPanel').classList.add('visible');
+  }
+}
+
+async function submitRecall() {
+  if (!currentJobId) return;
+  const answer = document.getElementById('recallAnswer').value.trim();
+  if (!answer) return;
+  const btn = document.getElementById('recallSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  try {
+    const rq = document.getElementById('recallQuestion').textContent;
+    const res = await fetch(API + '/videos/' + currentJobId + '/recall-response', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        student_id: 'local-user',
+        question_id: 'recall-' + rq.slice(0,20).replace(/[^a-z0-9]/gi,''),
+        answer_given: answer
+      })
+    });
+    const data = await res.json();
+    const fb = document.getElementById('recallFeedback');
+    fb.textContent = data.correct ? '✓ Correct! Nice work.' : '✗ Not quite. Your answer was recorded.';
+    fb.className = 'fb ' + (data.correct ? 'correct' : 'wrong');
+  } catch (e) {
+    document.getElementById('recallFeedback').textContent = 'Error checking answer.';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Check';
+}
+
+function downloadVideo() {
+  if (!currentVideoUrl) return;
+  const a = document.createElement('a');
+  a.href = currentVideoUrl.startsWith('http') ? currentVideoUrl : API + currentVideoUrl;
+  a.download = 'vivacity_video.mp4';
+  a.click();
+}
+
+function openEditorPage() {
+  if (currentJobId) {
+    window.open('/app/editor.html?job=' + currentJobId, '_blank');
+  }
+}
+
+// Enter to send
+document.getElementById('chatInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+</script>
+</body>
+</html>

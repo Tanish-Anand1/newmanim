@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vivacity Docs - API & Guides</title>
+  <meta property="og:title" content="Vivacity - Mathematical reasoning, made visible." />
+  <meta property="og:description" content="Type a concept. Get a Manim animation. Built for researchers, not presentations." />
+  <meta property="og:image" content="https://vivacity-five.vercel.app/assets/images/og-image.png" />
+  <meta property="og:url" content="https://vivacity-five.vercel.app" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Preload GeistPixel -->
+  <link rel="preload" href="fonts/GeistPixel-Regular-VariableFont_ELSH.ttf" as="font" type="font/ttf" crossorigin />
+
+  <!-- DM Mono + Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Docs specific overrides */
+    body { background: var(--bg); display: flex; flex-direction: column; min-height: 100vh; }
+    
+    .docs-header {
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      background: rgba(8,8,8,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .dh-left { font-family: var(--font-pixel); font-size: 14px; color: var(--t-1); text-decoration: none; font-variation-settings: 'ELSH' 100; }
+    .dh-right { font-family: var(--font-mono); font-size: 11px; color: var(--t-3); }
+
+    .docs-layout {
+      display: flex;
+      flex: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .docs-sidebar {
+      width: 240px;
+      border-right: 1px solid var(--border);
+      padding: 32px 16px;
+      position: sticky;
+      top: 48px;
+      height: calc(100vh - 48px);
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+
+    .docs-sidebar::-webkit-scrollbar { display: none; }
+
+    .ds-group { margin-bottom: 24px; }
+    .ds-label {
+      font-family: var(--font-mono); font-size: 10px; color: var(--t-3);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 8px; padding-left: 8px;
+    }
+    
+    .ds-link {
+      display: block;
+      font-family: var(--font-mono); font-size: 12px; color: var(--t-2);
+      text-decoration: none; padding: 6px 8px;
+      border-radius: var(--r);
+      transition: background 120ms, color 120ms;
+    }
+    .ds-link:hover { background: var(--bg-1); color: var(--t-1); }
+    .ds-link.active {
+      color: var(--t-1); background: var(--bg-2);
+      border-left: 2px solid var(--t-1); padding-left: 6px;
+    }
+
+    .docs-content {
+      flex: 1;
+      padding: 48px 64px 96px;
+      max-width: 800px;
+    }
+
+    /* Markdown prose styles */
+    .prose h1 { font-family: var(--font-pixel); font-size: 32px; color: var(--t-1); margin-bottom: 8px; line-height: 1.1; font-variation-settings: 'ELSH' 100; }
+    .prose h2 { font-family: var(--font-pixel); font-size: 20px; color: var(--t-1); margin-top: 48px; margin-bottom: 16px; font-variation-settings: 'ELSH' 100; }
+    .prose h3 { font-family: var(--font-mono); font-size: 14px; color: var(--t-2); margin-top: 32px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+    
+    .prose p { font-family: var(--font-sans); font-size: 15px; color: var(--t-2); line-height: 1.7; margin-bottom: 16px; }
+    .prose a { color: var(--t-1); text-decoration: underline; text-underline-offset: 3px; }
+    .prose a:hover { opacity: 0.7; }
+    
+    .prose ul { margin-bottom: 16px; padding-left: 24px; }
+    .prose li { font-family: var(--font-sans); font-size: 15px; color: var(--t-2); line-height: 1.7; margin-bottom: 8px; }
+
+    .prose code {
+      font-family: var(--font-mono); font-size: 13px;
+      background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 2px 6px; color: var(--accent);
+    }
+
+    .prose pre {
+      background: var(--bg-1); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 24px; margin: 24px 0;
+      overflow-x: auto; position: relative;
+    }
+    .prose pre code {
+      background: transparent; border: none; padding: 0; color: var(--t-2);
+      font-size: 13px; line-height: 1.6;
+    }
+    .prose pre::before {
+      content: attr(data-lang);
+      position: absolute; top: 8px; right: 12px;
+      font-family: var(--font-mono); font-size: 10px; color: var(--t-3); text-transform: uppercase;
+    }
+
+    @media (max-width: 768px) {
+      .docs-layout { flex-direction: column; }
+      .docs-sidebar {
+        width: 100%; height: auto; position: relative; top: 0;
+        border-right: none; border-bottom: 1px solid var(--border); padding: 24px;
+      }
+      .docs-content { padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="docs-header">
+    <a href="index.html" class="dh-left">V. docs</a>
+    <span class="dh-right">v0.1 · vivacity.dev</span>
+  </div>
+
+  <div class="docs-layout">
+    
+    <aside class="docs-sidebar">
+      <div class="ds-group">
+        <div class="ds-label">Getting Started</div>
+        <a href="#intro" class="ds-link active">Introduction</a>
+        <a href="#quickstart" class="ds-link">Quick Start</a>
+        <a href="#arch" class="ds-link">Architecture</a>
+      </div>
+
+      <div class="ds-group">
+        <div class="ds-label">Core Concepts</div>
+        <a href="#" class="ds-link">The Prompt Engine</a>
+        <a href="#" class="ds-link">Manim Pipeline</a>
+        <a href="#" class="ds-link">Audio Sync (WhisperX)</a>
+      </div>
+
+      <div class="ds-group">
+        <div class="ds-label">API Reference</div>
+        <a href="#api" class="ds-link">Authentication</a>
+        <a href="#api" class="ds-link">POST /generate</a>
+        <a href="#" class="ds-link">GET /status/:id</a>
+        <a href="#" class="ds-link">Webhooks</a>
+      </div>
+    </aside>
+
+    <main class="docs-content prose">
+      <h1 id="intro">Introduction</h1>
+      <p>Vivacity is a video generation engine for mathematical and scientific concepts. It accepts a text prompt and returns a Manim-rendered animation with phoneme-level synchronized audio. The process takes under 90 seconds end-to-end.</p>
+
+      <h3>What it is</h3>
+      <p>Vivacity is not a presentation tool. It generates precise, programmatic animations - the kind you would otherwise spend 4 hours writing in Python. The output is a video file, not a slide deck.</p>
+
+      <h3>Who it's for</h3>
+      <ul>
+        <li>Researchers who need to visualize a proof or derivation</li>
+        <li>Educators preparing concept explanations for undergraduate coursework</li>
+        <li>Platforms integrating AI-generated educational content via API</li>
+      </ul>
+
+      <h2 id="quickstart">Quick Start</h2>
+      <p>The easiest way to integrate Vivacity is using our official Python SDK. You'll need an API key from your dashboard.</p>
+      
+      <pre data-lang="bash"><code>pip install vivacity-sdk</code></pre>
+
+      <p>Initialize the client and send a prompt:</p>
+
+      <pre data-lang="python"><code><span class="c-kw">import</span> vivacity
+
+client <span class="c-op">=</span> vivacity<span class="c-op">.</span>Client(api_key<span class="c-op">=</span><span class="c-str">"viv_live_xxxxxxxx"</span>)
+
+<span class="c-cm"># This blocks until rendering is complete (usually ~90s)</span>
+video <span class="c-op">=</span> client<span class="c-op">.</span>generate(
+    prompt<span class="c-op">=</span><span class="c-str">"Show the cross product of two 3D vectors"</span>,
+    resolution<span class="c-op">=</span><span class="c-str">"1080p"</span>,
+    voice<span class="c-op">=</span><span class="c-str">"academic_male"</span>
+)
+
+<span class="c-kw">print</span>(<span class="c-str">f"Video ready at: {video.url}"</span>)</code></pre>
+
+      <h2 id="arch">Pipeline Architecture</h2>
+      <p>Four stages run sequentially per request:</p>
+      <ol>
+        <li><strong>Prompt interpretation:</strong> An LLM extracts mathematical intent and maps it to a scene graph.</li>
+        <li><strong>Code generation:</strong> Code2Video translates the scene graph to executable Python/Manim code. A critic model reviews it.</li>
+        <li><strong>Rendering:</strong> Manim renders the scene frame-by-frame on our GPU cluster.</li>
+        <li><strong>Audio sync:</strong> WhisperX aligns the generated voiceover to animation keyframes at the phoneme level.</li>
+      </ol>
+
+      <h2 id="api">REST API Reference</h2>
+      <p>If you prefer to hit the HTTP endpoints directly, you can interact with the REST API. All endpoints are rooted at <code>https://api.vivacity.dev/v1</code>.</p>
+      
+      <h3>Authentication</h3>
+      <p>Authenticate by passing your secret key in the <code>Authorization</code> header using the Bearer scheme.</p>
+      <pre data-lang="http"><code>Authorization: Bearer viv_live_xxxxxxxx</code></pre>
+
+      <h3>POST /generate</h3>
+      <p>Kicks off a generation job. Since rendering is asynchronous, this returns a job ID that you can poll or receive via webhook.</p>
+      <pre data-lang="bash"><code>curl -X POST https://api.vivacity.dev/v1/generate \
+  -H "Authorization: Bearer viv_live_xxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Explain the chain rule",
+    "resolution": "1080p",
+    "webhook_url": "https://api.yoursite.com/vivacity-hook"
+  }'</code></pre>
+
+      <p>Response:</p>
+      <pre data-lang="json"><code>{
+  "id": "job_01HVK...",
+  "status": "queued",
+  "created_at": "2026-07-09T12:00:00Z"
+}</code></pre>
+    </main>
+    
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MathReel — AI Video Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121c; --border: #1e1e32;
+      --primary: #00d4ff; --secondary: #ff6b35; --purple: #9b59ff;
+      --green: #00ff88; --gold: #ffd700; --text: #c8c8d0; --muted: #5a5a70; --white: #ffffff;
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; overflow-x: hidden; }
+    body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse 80% 50% at 20% 10%, rgba(0,212,255,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(155,89,255,0.05) 0%, transparent 60%); pointer-events: none; z-index: 0; }
+    .container { max-width: 760px; margin: 0 auto; padding: 0 20px 80px; position: relative; z-index: 1; }
+
+    /* Header */
+    header { text-align: center; padding: 48px 0 32px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); border-radius: 999px; padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--primary); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 18px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+    h1 { font-size: clamp(28px,6vw,48px); font-weight: 900; letter-spacing: -.03em; line-height: 1.1; color: var(--white); margin-bottom: 12px; }
+    h1 span { background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .subtitle { font-size: 15px; color: var(--muted); max-width: 460px; margin: 0 auto; line-height: 1.6; }
+
+    /* Cards */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 24px; margin-bottom: 16px; }
+    .card-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 12px; }
+
+    /* Toggle group */
+    .toggle-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .toggle-group { flex: 1; min-width: 160px; }
+    .toggle-group .card-label { margin-bottom: 8px; }
+    .toggle-btns { display: flex; gap: 6px; }
+    .tgl { flex: 1; background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-family: inherit; font-size: 13px; font-weight: 600; padding: 10px 8px; cursor: pointer; transition: all .2s; text-align: center; }
+    .tgl:hover { border-color: var(--primary); color: var(--text); }
+    .tgl.active { background: rgba(0,212,255,.12); border-color: var(--primary); color: var(--primary); }
+    .tgl.active-purple { background: rgba(155,89,255,.12); border-color: var(--purple); color: #b68aff; }
+
+    /* Input */
+    .input-label { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+    textarea { width: 100%; background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: 12px; color: var(--white); font-family: inherit; font-size: 15px; line-height: 1.6; padding: 14px 16px; resize: vertical; min-height: 90px; outline: none; transition: border-color .2s, box-shadow .2s; }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,212,255,.1); }
+
+    /* Examples */
+    .ex-label { font-size: 12px; color: var(--muted); margin: 12px 0 8px; }
+    .examples { display: flex; flex-wrap: wrap; gap: 7px; }
+    .chip { background: rgba(155,89,255,.08); border: 1px solid rgba(155,89,255,.2); border-radius: 999px; color: #b68aff; font-size: 12px; padding: 5px 12px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+    .chip:hover { background: rgba(155,89,255,.18); color: var(--white); }
+
+    /* Generate button */
+    .btn-gen { width: 100%; background: linear-gradient(135deg, var(--primary) 0%, #006aff 100%); border: none; border-radius: 14px; color: #000; font-family: inherit; font-size: 16px; font-weight: 700; padding: 17px; cursor: pointer; margin-top: 16px; transition: opacity .2s, transform .1s; }
+    .btn-gen:hover { opacity: .9; }
+    .btn-gen:active { transform: scale(.99); }
+    .btn-gen:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* Progress */
+    .progress-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 24px; margin-bottom: 16px; display: none; }
+    .progress-card.visible { display: block; }
+    .prog-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .prog-title { font-size: 15px; font-weight: 600; color: var(--white); }
+    .prog-pct { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--primary); }
+    .bar-track { background: rgba(0,0,0,.4); border-radius: 999px; height: 5px; overflow: hidden; margin-bottom: 20px; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--purple)); border-radius: 999px; transition: width .6s ease; width: 0%; }
+    .steps { display: flex; flex-direction: column; gap: 9px; }
+    .step { display: flex; align-items: center; gap: 11px; font-size: 13px; color: var(--muted); transition: color .3s; }
+    .step.active { color: var(--white); }
+    .step.done { color: var(--green); }
+    .step-ic { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; transition: all .3s; }
+    .step.active .step-ic { border-color: var(--primary); background: rgba(0,212,255,.1); color: var(--primary); animation: ring 1.4s infinite; }
+    .step.done .step-ic { border-color: var(--green); background: rgba(0,255,136,.1); color: var(--green); }
+    @keyframes ring { 0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.5)} 50%{box-shadow:0 0 0 5px rgba(0,212,255,0)} }
+    .prog-msg { margin-top: 14px; font-size: 13px; color: var(--muted); font-style: italic; min-height: 18px; }
+
+    /* Preview */
+    .preview-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 22px; margin-bottom: 16px; display: none; }
+    .preview-card.visible { display: block; }
+    .preview-header-label { font-size: 11px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .preview-vid-title { font-size: 18px; font-weight: 800; color: var(--white); margin-bottom: 16px; line-height: 1.3; }
+    .scene-list { display: flex; flex-direction: column; gap: 9px; }
+    .sc-card { background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; transition: border-color .3s, background .3s; }
+    .sc-card.sc-active { border-color: var(--primary); background: rgba(0,212,255,.05); }
+    .sc-card.sc-done { border-color: rgba(0,255,136,.28); }
+    .sc-num { width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; background: rgba(155,89,255,.12); border: 1px solid rgba(155,89,255,.25); color: #b68aff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all .3s; }
+    .sc-card.sc-done .sc-num { background: rgba(0,255,136,.1); border-color: rgba(0,255,136,.3); color: var(--green); }
+    .sc-card.sc-active .sc-num { background: rgba(0,212,255,.12); border-color: rgba(0,212,255,.4); color: var(--primary); animation: pulse 1.2s infinite; }
+    .sc-body { flex: 1; min-width: 0; }
+    .sc-title-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; flex-wrap: wrap; }
+    .sc-title { font-size: 13px; font-weight: 600; color: var(--white); }
+    .sc-dur { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--primary); background: rgba(0,212,255,.1); border: 1px solid rgba(0,212,255,.2); border-radius: 4px; padding: 1px 6px; display: none; }
+    .sc-narration { font-size: 12px; color: var(--muted); line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .sc-icon { font-size: 13px; flex-shrink: 0; margin-top: 5px; min-width: 15px; text-align: center; }
+
+    /* Error */
+    .err-card { background: rgba(255,45,120,.06); border: 1px solid rgba(255,45,120,.2); border-radius: 13px; padding: 16px; color: #ff8aaa; font-size: 14px; margin-top: 14px; display: none; }
+    .err-card.visible { display: block; }
+    .err-card code { font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; display: block; margin-top: 7px; color: #ff5c7a; opacity: .8; }
+
+    /* Video */
+    .video-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; display: none; }
+    .video-card.visible { display: block; }
+    .video-wrapper { background: #000; display: flex; align-items: center; justify-content: center; }
+    .video-wrapper.portrait { aspect-ratio: 9/16; max-height: 68vh; margin: 0 auto; max-width: 380px; }
+    .video-wrapper.landscape { aspect-ratio: 16/9; width: 100%; }
+    video { width: 100%; height: 100%; object-fit: contain; }
+    .video-footer { padding: 14px 18px; display: flex; gap: 10px; }
+    .btn-dl { flex: 1; background: rgba(0,212,255,.1); border: 1px solid rgba(0,212,255,.25); border-radius: 10px; color: var(--primary); font-family: inherit; font-size: 14px; font-weight: 600; padding: 11px; cursor: pointer; text-decoration: none; text-align: center; transition: all .2s; }
+    .btn-dl:hover { background: rgba(0,212,255,.18); border-color: var(--primary); }
+    .btn-new { flex: 1; background: rgba(155,89,255,.1); border: 1px solid rgba(155,89,255,.25); border-radius: 10px; color: #b68aff; font-family: inherit; font-size: 14px; font-weight: 600; padding: 11px; cursor: pointer; transition: all .2s; }
+    .btn-new:hover { background: rgba(155,89,255,.18); color: var(--white); }
+
+    footer { text-align: center; padding: 36px 0 20px; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="badge"><div class="dot"></div> AI-Powered</div>
+    <h1>Ask anything.<br><span>Get a video.</span></h1>
+    <p class="subtitle">Type any question. Choose your format and language. Get a fully animated, narrated video.</p>
+  </header>
+
+  <!-- Settings + Input -->
+  <div class="card">
+    <div class="toggle-row">
+      <!-- Format -->
+      <div class="toggle-group">
+        <div class="card-label">Format</div>
+        <div class="toggle-btns">
+          <button class="tgl active" id="fmt-portrait" onclick="setFmt('portrait')">📱 Portrait</button>
+          <button class="tgl" id="fmt-landscape" onclick="setFmt('landscape')">🖥 Landscape</button>
+        </div>
+      </div>
+      <!-- Language -->
+      <div class="toggle-group">
+        <div class="card-label">Language</div>
+        <div class="toggle-btns">
+          <button class="tgl active" id="lang-english" onclick="setLang('english')">🇬🇧 English</button>
+          <button class="tgl" id="lang-hinglish" onclick="setLang('hinglish')" style="font-size:12px">🇮🇳 Hinglish</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-label">Your Question</div>
+    <textarea id="question" placeholder="e.g. Why does e^(iπ) + 1 = 0? Or: Did you know first radio signals are passing alien stars right now?" rows="3"></textarea>
+
+    <div class="ex-label">Try one →</div>
+    <div class="examples" id="examples">
+      <span class="chip">What is a derivative?</span>
+      <span class="chip">How does integration by parts work?</span>
+      <span class="chip">Euler's formula e^(iπ) = -1</span>
+      <span class="chip">Prove AM-GM inequality</span>
+      <span class="chip">Why does 0.999... = 1?</span>
+      <span class="chip">How does gradient descent work?</span>
+      <span class="chip">Radio signals reaching alien stars</span>
+      <span class="chip">How does DNA store information?</span>
+      <span class="chip">What is the Pythagorean theorem?</span>
+    </div>
+
+    <button class="btn-gen" id="btn-gen">✦ Generate Video</button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-card" id="progress-card">
+    <div class="prog-head">
+      <div class="prog-title">Generating your video</div>
+      <div class="prog-pct" id="pct-text">0%</div>
+    </div>
+    <div class="bar-track"><div class="bar-fill" id="bar"></div></div>
+    <div class="steps">
+      <div class="step" id="step-scripting"><div class="step-ic">✍</div><span>Writing the script</span></div>
+      <div class="step" id="step-audio"><div class="step-ic">🎙</div><span>Generating voice (OpenAI TTS)</span></div>
+      <div class="step" id="step-coding"><div class="step-ic">⚡</div><span>Coding the animations</span></div>
+      <div class="step" id="step-rendering"><div class="step-ic">🎬</div><span>Rendering scenes (parallel)</span></div>
+      <div class="step" id="step-stitching"><div class="step-ic">✂</div><span>Final cut &amp; audio mix</span></div>
+    </div>
+    <div class="prog-msg" id="msg-text">Starting...</div>
+    <div class="err-card" id="err-card"><strong>Something went wrong.</strong><code id="err-text"></code></div>
+  </div>
+
+  <!-- Script preview -->
+  <div class="preview-card" id="preview-card">
+    <div class="preview-header-label">✓ Script Generated</div>
+    <div class="preview-vid-title" id="preview-title"></div>
+    <div class="scene-list" id="scene-list"></div>
+  </div>
+
+  <!-- Video -->
+  <div class="video-card" id="video-card">
+    <div class="video-wrapper portrait" id="video-wrapper">
+      <video id="player" controls playsinline></video>
+    </div>
+    <div class="video-footer">
+      <a class="btn-dl" id="btn-dl" href="#" download>↓ Download MP4</a>
+      <button class="btn-new" id="btn-new">+ New Video</button>
+    </div>
+  </div>
+
+  <footer>Claude claude-opus-4-7 · OpenAI TTS (gpt-4o-mini-tts) · Manim · FFmpeg</footer>
+</div>
+
+<script>
+const STEPS = ['scripting','audio','coding','rendering','stitching'];
+let pollInterval = null;
+let currentFormat = 'portrait';
+let currentLang = 'english';
+
+// Format / Language toggles
+function setFmt(f) {
+  currentFormat = f;
+  document.querySelectorAll('[id^="fmt-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('fmt-'+f).classList.add('active');
+}
+function setLang(l) {
+  currentLang = l;
+  document.querySelectorAll('[id^="lang-"]').forEach(b => { b.classList.remove('active','active-purple'); });
+  const btn = document.getElementById('lang-'+l);
+  btn.classList.add(l === 'hinglish' ? 'active-purple' : 'active');
+  // Update examples for Hinglish
+  if (l === 'hinglish') {
+    document.getElementById('question').placeholder =
+      'e.g. Derivative kya hoti hai? Ya: Euler ka formula kyun kaam karta hai?';
+  } else {
+    document.getElementById('question').placeholder =
+      'e.g. Why does e^(iπ) + 1 = 0? Or: Did you know first radio signals are passing alien stars right now?';
+  }
+}
+
+// Examples
+document.getElementById('examples').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (chip) document.getElementById('question').value = chip.textContent;
+});
+
+// Generate
+document.getElementById('btn-gen').addEventListener('click', startGenerate);
+document.getElementById('question').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) startGenerate();
+});
+
+async function startGenerate() {
+  const q = document.getElementById('question').value.trim();
+  if (!q) { document.getElementById('question').focus(); return; }
+  setUIState('generating');
+  try {
+    const res = await fetch('/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ question: q, format: currentFormat, language: currentLang }),
+    });
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const { job_id } = await res.json();
+    pollStatus(job_id);
+  } catch(err) { showError(err.message); }
+}
+
+function pollStatus(job_id) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/status/${job_id}`);
+      if (!res.ok) return;
+      const job = await res.json();
+      updateUI(job);
+      if (job.status === 'done' || job.status === 'error') {
+        clearInterval(pollInterval); pollInterval = null;
+      }
+    } catch(_) {}
+  }, 1500);
+}
+
+function updateUI(job) {
+  document.getElementById('bar').style.width = `${job.progress}%`;
+  document.getElementById('pct-text').textContent = `${job.progress}%`;
+  document.getElementById('msg-text').textContent = job.message || '';
+
+  // Reset steps
+  STEPS.forEach(s => {
+    const el = document.getElementById('step-'+s);
+    el.className = 'step';
+    el.querySelector('.step-ic').textContent = {scripting:'✍',audio:'🎙',coding:'⚡',rendering:'🎬',stitching:'✂'}[s];
+  });
+
+  if (job.status === 'error') { showError(job.error || 'Unknown error'); return; }
+
+  if (job.status === 'done') {
+    STEPS.forEach(s => { const el=document.getElementById('step-'+s); el.classList.add('done'); el.querySelector('.step-ic').textContent='✓'; });
+    showVideo(job.video_url);
+  } else {
+    const idx = STEPS.indexOf(job.status);
+    STEPS.forEach((s,i) => {
+      const el = document.getElementById('step-'+s);
+      if (i < idx) { el.classList.add('done'); el.querySelector('.step-ic').textContent='✓'; }
+      else if (i === idx) { el.classList.add('active'); el.querySelector('.step-ic').textContent='●'; }
+    });
+  }
+
+  updatePreview(job);
+}
+
+function updatePreview(job) {
+  const sp = job.script_preview;
+  if (!sp) return;
+  document.getElementById('preview-card').classList.add('visible');
+  document.getElementById('preview-title').textContent = sp.title || '';
+  const list = document.getElementById('scene-list');
+  const durs = job.audio_durations || [];
+  const cur = job.current_scene || 0;
+  if (list.children.length !== sp.scenes.length) {
+    list.innerHTML = '';
+    sp.scenes.forEach((sc, i) => {
+      const d = document.createElement('div');
+      d.className = 'sc-card'; d.id = 'scard-'+i;
+      d.innerHTML = `<div class="sc-num" id="snum-${i}">${i+1}</div><div class="sc-body"><div class="sc-title-row"><span class="sc-title">${sc.title}</span><span class="sc-dur" id="sdur-${i}"></span></div><div class="sc-narration">"${sc.narration}"</div></div><div class="sc-icon" id="sicon-${i}"></div>`;
+      list.appendChild(d);
+    });
+  }
+  durs.forEach((d,i) => { const el=document.getElementById('sdur-'+i); if(el){el.textContent=`${d}s`;el.style.display='';} });
+  sp.scenes.forEach((_,i) => {
+    const card=document.getElementById('scard-'+i), icon=document.getElementById('sicon-'+i), num=document.getElementById('snum-'+i);
+    if(!card) return;
+    card.classList.remove('sc-active','sc-done');
+    if (job.status==='done') { card.classList.add('sc-done'); num.textContent='✓'; icon.textContent=''; }
+    else if (cur>0) {
+      if (i+1<cur) { card.classList.add('sc-done'); num.textContent='✓'; icon.textContent=''; }
+      else if (i+1===cur) { card.classList.add('sc-active'); icon.textContent='⏳'; num.textContent=i+1; }
+    }
+  });
+}
+
+function showVideo(url) {
+  const vc = document.getElementById('video-card');
+  const vw = document.getElementById('video-wrapper');
+  vc.classList.add('visible');
+  vw.className = 'video-wrapper ' + currentFormat;
+  const player = document.getElementById('player');
+  player.src = url; player.load(); player.play().catch(()=>{});
+  const dl = document.getElementById('btn-dl');
+  dl.href = url; dl.download = 'video.mp4';
+  document.getElementById('progress-card').style.opacity = '0.5';
+}
+
+function showError(msg) {
+  document.getElementById('err-card').classList.add('visible');
+  document.getElementById('err-text').textContent = msg;
+  document.getElementById('btn-gen').disabled = false;
+  document.getElementById('btn-gen').textContent = '✦ Try Again';
+}
+
+function setUIState(state) {
+  const btn = document.getElementById('btn-gen');
+  if (state === 'generating') {
+    btn.disabled = true; btn.textContent = 'Generating...';
+    document.getElementById('progress-card').classList.add('visible');
+    document.getElementById('progress-card').style.opacity = '1';
+    document.getElementById('video-card').classList.remove('visible');
+    document.getElementById('preview-card').classList.remove('visible');
+    document.getElementById('scene-list').innerHTML = '';
+    document.getElementById('err-card').classList.remove('visible');
+    document.getElementById('bar').style.width = '0%';
+    document.getElementById('pct-text').textContent = '0%';
+  }
+}
+
+document.getElementById('btn-new').addEventListener('click', () => {
+  document.getElementById('video-card').classList.remove('visible');
+  document.getElementById('progress-card').classList.remove('visible');
+  document.getElementById('preview-card').classList.remove('visible');
+  document.getElementById('question').value = '';
+  document.getElementById('btn-gen').disabled = false;
+  document.getElementById('btn-gen').textContent = '✦ Generate Video';
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+</script>
+</body>
+</html>

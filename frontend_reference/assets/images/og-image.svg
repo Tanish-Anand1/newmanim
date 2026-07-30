@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050505" />
+      <stop offset="100%" stop-color="#0a0a0a" />
+    </linearGradient>
+
+    <!-- Neon Blue Glow -->
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00c3ff" />
+      <stop offset="100%" stop-color="#0055ff" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="heavyGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="25" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)" />
+
+  <!-- Grid lines -->
+  <g stroke="rgba(255,255,255,0.05)" stroke-width="1">
+    <!-- Vertical lines -->
+    <line x1="100" y1="0" x2="100" y2="630" />
+    <line x1="200" y1="0" x2="200" y2="630" />
+    <line x1="300" y1="0" x2="300" y2="630" />
+    <line x1="400" y1="0" x2="400" y2="630" />
+    <line x1="500" y1="0" x2="500" y2="630" />
+    <line x1="600" y1="0" x2="600" y2="630" />
+    <line x1="700" y1="0" x2="700" y2="630" />
+    <line x1="800" y1="0" x2="800" y2="630" />
+    <line x1="900" y1="0" x2="900" y2="630" />
+    <line x1="1000" y1="0" x2="1000" y2="630" />
+    <line x1="1100" y1="0" x2="1100" y2="630" />
+    
+    <!-- Horizontal lines -->
+    <line x1="0" y1="100" x2="1200" y2="100" />
+    <line x1="0" y1="200" x2="1200" y2="200" />
+    <line x1="0" y1="300" x2="1200" y2="300" />
+    <line x1="0" y1="400" x2="1200" y2="400" />
+    <line x1="0" y1="500" x2="1200" y2="500" />
+    <line x1="0" y1="600" x2="1200" y2="600" />
+  </g>
+
+  <!-- Abstract Vector Field Math Graphic (Right Side) -->
+  <g transform="translate(600, 100)">
+    <!-- Axes -->
+    <line x1="0" y1="200" x2="500" y2="200" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
+    <line x1="250" y1="0" x2="250" y2="400" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
+    
+    <!-- Geometric curves -->
+    <path d="M 50 200 Q 150 50 250 200 T 450 200" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-dasharray="10,10" />
+    <path d="M 150 350 Q 250 150 400 100" fill="none" stroke="url(#neon)" stroke-width="6" filter="url(#heavyGlow)" />
+    
+    <!-- Data points -->
+    <circle cx="150" cy="350" r="8" fill="#00c3ff" filter="url(#glow)" />
+    <circle cx="250" cy="215" r="8" fill="#00c3ff" filter="url(#glow)" />
+    <circle cx="400" cy="100" r="8" fill="#fff" filter="url(#glow)" />
+    
+    <!-- Matrix text -->
+    <text x="350" y="70" font-family="monospace" font-size="24" fill="rgba(255,255,255,0.8)" filter="url(#glow)">∇ × F</text>
+    <text x="70" y="160" font-family="monospace" font-size="24" fill="rgba(255,255,255,0.6)">[ 1  0 ]</text>
+    <text x="70" y="190" font-family="monospace" font-size="24" fill="rgba(255,255,255,0.6)">[ 0 -1 ]</text>
+  </g>
+
+  <!-- Typography (Left Side) -->
+  <g transform="translate(100, 250)">
+    <!-- Main Title -->
+    <text x="0" y="0" font-family="sans-serif" font-weight="900" font-size="96" fill="#ffffff" letter-spacing="-2">Vivacity.</text>
+    <!-- Subtitle -->
+    <text x="0" y="60" font-family="sans-serif" font-weight="400" font-size="32" fill="rgba(255,255,255,0.6)">Mathematical reasoning,</text>
+    <text x="0" y="100" font-family="sans-serif" font-weight="400" font-size="32" fill="rgba(255,255,255,0.6)">made visible.</text>
+    
+    <!-- Decorative tag -->
+    <rect x="0" y="160" width="160" height="40" rx="20" fill="rgba(0,195,255,0.1)" stroke="rgba(0,195,255,0.5)" stroke-width="1" />
+    <text x="80" y="185" font-family="monospace" font-size="14" fill="#00c3ff" text-anchor="middle" letter-spacing="2">NO ACCOUNT NEEDED</text>
+  </g>
+
+  <!-- Ambient light -->
+  <circle cx="200" cy="500" r="150" fill="rgba(0, 140, 255, 0.15)" filter="url(#heavyGlow)" />
+</svg>

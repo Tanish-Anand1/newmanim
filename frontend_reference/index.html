@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<script>window.location.replace('/signup.html');</script>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vivacity - Mathematical reasoning, made visible.</title>
+  <meta property="og:title" content="Vivacity - Mathematical reasoning, made visible." />
+  <meta property="og:description" content="Type a concept. Get a Manim animation. Built for researchers, not presentations." />
+  <meta property="og:image" content="https://vivacity-five.vercel.app/assets/images/og-image.png" />
+  <meta property="og:url" content="https://vivacity-five.vercel.app" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="description"
+    content="Vivacity is a Manim-based AI video generation engine. Type a mathematical concept - get a precisely animated explanation video in under 90 seconds." />
+  <meta property="og:title" content="Vivacity - Mathematical reasoning, made visible." />
+  <meta property="og:description"
+    content="Manim-powered AI video generation for researchers, educators, and students." />
+
+  <!-- Preload GeistPixel -->
+  <link rel="preload" href="fonts/GeistPixel-Regular-VariableFont_ELSH.ttf" as="font" type="font/ttf" crossorigin />
+
+  <!-- DM Mono + Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <!-- ══ NAV ══════════════════════════════════ -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">Vivacity.</a>
+      <div class="nav-links" id="navLinks">
+        <a href="docs.html">docs</a>
+        <span class="nav-sep">·</span>
+        <a href="#pricing">pricing</a>
+        <span class="nav-sep">·</span>
+        <a href="#examples">examples</a>
+        <span class="nav-sep">·</span>
+        <a href="#faq">faq</a>
+        <span class="nav-sep">·</span>
+        <a href="signup.html">sign in</a>
+      </div>
+      <a href="signup.html" class="nav-cta" id="navCta">start building</a>
+      <button class="nav-burger" id="navBurger" aria-label="Toggle menu">
+        <span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Fullscreen Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-inner">
+      <a href="docs.html" class="mm-link">docs</a>
+      <a href="index.html#pricing" class="mm-link">pricing</a>
+      <a href="index.html#examples" class="mm-link">examples</a>
+      <a href="index.html#faq" class="mm-link">faq</a>
+      <a href="signup.html" class="mm-link">sign in</a>
+      <a href="signup.html" class="mm-link">start building</a>
+    </div>
+  </div>
+
+  <!-- ══ HERO ════════════════════════════════ -->
+  <section class="hero" id="hero">
+    <div class="hero-inner">
+
+      <div class="hero-split">
+        <!-- Hero Left: Text & Input -->
+        <div class="hero-content">
+
+          <h1 class="hero-h1">
+            <span class="hero-line" style="--i:0">Mathematical</span>
+            <span class="hero-line" style="--i:1">reasoning,</span>
+            <span class="hero-line hero-line--dim" style="--i:2">made visible.</span>
+          </h1>
+
+          <p class="hero-body">
+            Type a concept. Get a Manim animation.<br class="br-desk" />
+            Built for researchers, not presentations.
+          </p>
+
+          <!-- Prompt input -->
+          <div class="hero-input-wrap">
+            <div class="hero-input-box" id="heroBox">
+              <textarea class="hero-input" id="heroInput" rows="1" placeholder="e.g. prove the divergence..."
+                autocomplete="off" spellcheck="false"></textarea>
+              <button class="hero-submit" id="heroSubmit" aria-label="Generate">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <line x1="8" y1="3" x2="8" y2="13" />
+                  <polyline points="4 9 8 13 12 9" />
+                </svg>
+              </button>
+            </div>
+            <div class="hero-suggestions">
+              <span class="suggestion-label">Suggested:</span>
+              <button class="suggestion-pill" onclick="document.getElementById('heroInput').value=this.innerText; document.getElementById('heroInput').focus();">Stokes' theorem visual proof</button>
+              <button class="suggestion-pill" onclick="document.getElementById('heroInput').value=this.innerText; document.getElementById('heroInput').focus();">Maxwell's equations animated</button>
+              <button class="suggestion-pill" onclick="document.getElementById('heroInput').value=this.innerText; document.getElementById('heroInput').focus();">Eigenvalue decomposition</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Right: Video -->
+        <div class="hero-media">
+          <div class="hero-video-wrapper">
+            <div class="vc-meta hero-video-meta">
+              <span class="vc-tag">featured</span>
+            </div>
+            <video class="h-video" src="assets/videos/divergence.mp4" autoplay muted loop playsinline></video>
+          </div>
+        </div>
+      </div>
+
+
+
+    </div>
+  </section>
+
+  <!-- ══ STATS STRIP ══════════════════════════ -->
+  <div class="stats-strip">
+    <div class="stats-inner">
+      <div class="stat-item">
+        <span class="stat-num">90s</span>
+        <span class="stat-lbl">avg render</span>
+      </div>
+      <span class="stat-div">·</span>
+      <div class="stat-item">
+        <span class="stat-num">4K</span>
+        <span class="stat-lbl">max output</span>
+      </div>
+      <span class="stat-div">·</span>
+      <div class="stat-item">
+        <span class="stat-num">60+</span>
+        <span class="stat-lbl">topics</span>
+      </div>
+      <span class="stat-div">·</span>
+      <div class="stat-item">
+        <span class="stat-num">phoneme</span>
+        <span class="stat-lbl">audio sync</span>
+      </div>
+      <span class="stat-div">·</span>
+      <div class="stat-item">
+        <span class="stat-num">Manim</span>
+        <span class="stat-lbl">renderer</span>
+      </div>
+      <span class="stat-div">·</span>
+      <div class="stat-item">
+        <span class="stat-num">REST</span>
+        <span class="stat-lbl">API access</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BIG LOGO MARQUEE ══════════════════════════════ -->
+  <div class="logo-marquee-section" aria-hidden="true">
+    <div class="logo-marquee-label">TRUSTED BY RESEARCHERS AT</div>
+    <div class="logo-marquee-mask">
+      <div class="logo-marquee-inner">
+        <!-- Group 1 -->
+        <span class="uni-logo uni-stanford">Stanford</span>
+        <span class="uni-logo uni-mit">MIT</span>
+        <span class="uni-logo uni-oxford">UNIVERSITY OF OXFORD</span>
+        <span class="uni-logo uni-berkeley">Berkeley</span>
+        <span class="uni-logo uni-cambridge">UNIVERSITY OF CAMBRIDGE</span>
+        <span class="uni-logo uni-eth">ETH ZÜRICH</span>
+
+        <!-- Group 2 (Duplicate for infinite scroll) -->
+        <span class="uni-logo uni-stanford">Stanford</span>
+        <span class="uni-logo uni-mit">MIT</span>
+        <span class="uni-logo uni-oxford">UNIVERSITY OF OXFORD</span>
+        <span class="uni-logo uni-berkeley">Berkeley</span>
+        <span class="uni-logo uni-cambridge">UNIVERSITY OF CAMBRIDGE</span>
+        <span class="uni-logo uni-eth">ETH ZÜRICH</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VIDEO SHOWCASE ════════════════════════ -->
+  <section class="video-section" id="examples">
+    <div class="content-wrap">
+      <div class="section-header-row">
+        <div>
+          <h2 class="section-h2">Real outputs.</h2>
+          <div class="section-sub">GENERATED BY VIVACITY · NO HUMAN EDITING · NO POST-PRODUCTION</div>
+        </div>
+        <a href="https://youtube.com/@vivacity-paxus?si=_fRgvHPhwhag0_EQ" target="_blank" class="section-link">view more examples ↗</a>
+      </div>
+
+      <div class="video-grid">
+
+        <!-- Video 1 (Real) -->
+        <div class="video-card">
+          <div class="video-card-top">
+            <div class="vc-meta">
+              <span class="vc-tag">featured</span>
+              <span class="vc-title">Complex analysis - Domain coloring</span>
+            </div>
+            <div class="vc-status">
+              <span class="vc-dur">~50s render</span>
+            </div>
+          </div>
+          <div class="video-wrap">
+            <video class="vc-video" src="assets/videos/demo-537.mp4" autoplay muted loop playsinline preload="metadata"></video>
+            <div class="video-overlay">
+              <button class="vc-play-btn" data-video="v1" aria-label="Toggle play">
+                <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+                <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="video-card-bottom">
+            <span class="vc-prompt-label">prompt -</span>
+            <span class="vc-prompt">"Animate domain coloring for a complex function over the complex plane"</span>
+          </div>
+        </div>
+
+        <!-- Video 2 -->
+        <div class="video-card">
+          <div class="video-card-top">
+            <div class="vc-meta">
+              <span class="vc-tag">geometry</span>
+              <span class="vc-title">Geometric Transformations</span>
+            </div>
+            <div class="vc-status">
+              <span class="vc-dur">~40s render</span>
+            </div>
+          </div>
+          <div class="video-wrap">
+            <video class="vc-video" src="assets/videos/demo-vid1.mp4" autoplay muted loop playsinline preload="auto"></video>
+          </div>
+          <div class="video-card-bottom">
+            <span class="vc-prompt-label">prompt -</span>
+            <span class="vc-prompt">"Animate a rotating geometric structure in 3D"</span>
+          </div>
+        </div>
+
+        <!-- Video 3 -->
+        <div class="video-card">
+          <div class="video-card-top">
+            <div class="vc-meta">
+              <span class="vc-tag">calculus</span>
+              <span class="vc-title">Derivative Visualized</span>
+            </div>
+            <div class="vc-status">
+              <span class="vc-dur">~30s render</span>
+            </div>
+          </div>
+          <div class="video-wrap">
+            <video class="vc-video" src="assets/videos/demo-vid2.mp4" autoplay muted loop playsinline preload="auto"></video>
+          </div>
+          <div class="video-card-bottom">
+            <span class="vc-prompt-label">prompt -</span>
+            <span class="vc-prompt">"Visualize the derivative of a cubic function"</span>
+          </div>
+        </div>
+
+        <!-- Real Video: Divergence -->
+        <div class="video-card">
+          <div class="video-card-top">
+            <div class="vc-meta">
+              <span class="vc-tag">vector calculus</span>
+              <span class="vc-title">Divergence Theorem</span>
+            </div>
+            <div class="vc-status">
+              <span class="vc-dur">2:14</span>
+            </div>
+          </div>
+          <div class="video-wrap">
+            <video class="vc-video" src="assets/videos/divergence.mp4" autoplay muted loop playsinline preload="metadata"></video>
+            <div class="video-overlay">
+              <button class="vc-play-btn" data-video="v4" aria-label="Toggle play">
+                <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+                <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="video-card-bottom">
+            <span class="vc-prompt-label">prompt -</span>
+            <span class="vc-prompt">"Visualize the divergence theorem with animated vector field"</span>
+          </div>
+        </div>
+
+        <!-- Real Video: Unit Circle -->
+        <div class="video-card">
+          <div class="video-card-top">
+            <div class="vc-meta">
+              <span class="vc-tag">geometry</span>
+              <span class="vc-title">Unit Circle Trigonometry</span>
+            </div>
+            <div class="vc-status">
+              <span class="vc-dur">1:15</span>
+            </div>
+          </div>
+          <div class="video-wrap">
+            <video class="vc-video" src="assets/videos/unit_circle.mp4" autoplay muted loop playsinline preload="auto"></video>
+          </div>
+          <div class="video-card-bottom">
+            <span class="vc-prompt-label">prompt -</span>
+            <span class="vc-prompt">"Show the geometric derivation of sine and cosine on the unit circle"</span>
+          </div>
+        </div>
+
+        <!-- Real Video: Matrix Multiplication -->
+        <div class="video-card">
+          <div class="video-card-top">
+            <div class="vc-meta">
+              <span class="vc-tag">algebra</span>
+              <span class="vc-title">Matrix Multiplication</span>
+            </div>
+            <div class="vc-status">
+              <span class="vc-dur">0:45</span>
+            </div>
+          </div>
+          <div class="video-wrap">
+            <video class="vc-video" src="assets/videos/matrix.mp4" autoplay muted loop playsinline preload="auto"></video>
+          </div>
+          <div class="video-card-bottom">
+            <span class="vc-prompt-label">prompt -</span>
+            <span class="vc-prompt">"Visualize matrix vector multiplication step by step"</span>
+          </div>
+        </div>
+
+    </div>
+  </div>
+</section>
+
+  <!-- ══ HOW IT WORKS ████████████████████████ -->
+  <section class="how-section reveal-section">
+    <div class="content-wrap">
+      <div class="section-header-row">
+        <div>
+          <h2 class="section-h2">The pipeline.</h2>
+          <div class="section-sub">FOUR STAGES · END-TO-END AUTOMATED · UNDER 90 SECONDS</div>
+        </div>
+      </div>
+
+      <div class="pipeline-grid">
+        <div class="pipeline-step">
+          <div class="ps-num">01</div>
+          <div class="ps-body">
+            <div class="ps-title">Prompt interpretation</div>
+            <p class="ps-desc">A language model parses your input and extracts mathematical intent - mapping it to a
+              scene graph of objects, motions, and timing relationships.</p>
+          </div>
+        </div>
+        <div class="pipeline-connector">→</div>
+        <div class="pipeline-step">
+          <div class="ps-num">02</div>
+          <div class="ps-body">
+            <div class="ps-title">Code generation</div>
+            <p class="ps-desc">Code2Video translates the scene graph to executable Python/Manim code. A critic model
+              reviews the code for validity before it reaches the renderer.</p>
+          </div>
+        </div>
+        <div class="pipeline-connector">→</div>
+        <div class="pipeline-step">
+          <div class="ps-num">03</div>
+          <div class="ps-body">
+            <div class="ps-title">GPU rendering</div>
+            <p class="ps-desc">The Manim engine renders your scene frame-by-frame on a GPU cluster. Typical render time:
+              30–60 seconds for a 2-minute video.</p>
+          </div>
+        </div>
+        <div class="pipeline-connector">→</div>
+        <div class="pipeline-step">
+          <div class="ps-num">04</div>
+          <div class="ps-body">
+            <div class="ps-title">Audio-visual sync</div>
+            <p class="ps-desc">WhisperX aligns the AI-generated voiceover to animation keyframes at phoneme-level
+              precision. This is Vivacity's primary technical differentiator.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Code block -->
+      <div class="code-block-wrap reveal-section">
+        <div class="code-block-header">
+          <span class="code-lang">python</span>
+          <span class="code-title">Quick example - Python SDK</span>
+        </div>
+        <pre
+          class="code-block"><code><span class="c-kw">import</span> vivacity
+
+client <span class="c-op">=</span> vivacity<span class="c-op">.</span>Client(api_key<span class="c-op">=</span><span class="c-str">"viv_..."</span>)
+
+video <span class="c-op">=</span> client<span class="c-op">.</span>generate(
+    prompt<span class="c-op">=</span><span class="c-str">"Prove the Cauchy-Schwarz inequality geometrically"</span>,
+    duration_hint<span class="c-op">=</span><span class="c-num">120</span>,   <span class="c-cm"># target seconds</span>
+    resolution<span class="c-op">=</span><span class="c-str">"1080p"</span>,
+)
+
+<span class="c-kw">print</span>(video<span class="c-op">.</span>url)  <span class="c-cm"># → https://cdn.vivacity.dev/v/abc123.mp4</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ APP SHOT ══════════════════════════════ -->
+  <section class="appshot-section reveal-section" id="interface">
+    <div class="content-wrap">
+      <h2 class="section-h2">The interface.</h2>
+      <div class="section-sub">SPLIT SCREEN · PROMPT LEFT · OUTPUT RIGHT</div>
+
+      <div class="browser-frame">
+        <div class="browser-chrome">
+          <div class="chrome-dots">
+            <span class="cdot"></span><span class="cdot"></span><span class="cdot"></span>
+          </div>
+          <div class="chrome-url-pill">app.vivacity.dev/workspace</div>
+          <div style="width:70px;flex-shrink:0"></div>
+        </div>
+
+        <div class="browser-panels">
+          <!-- Left panel -->
+          <div class="panel-left">
+            <div class="panel-topbar">
+              <span class="panel-label">WORKSPACE</span>
+              <span class="panel-label" style="color:var(--t-3)">·</span>
+              <span class="panel-label" style="color:var(--t-3);font-size:10px">session_042</span>
+              <button class="panel-plus">+</button>
+            </div>
+            <div class="panel-messages">
+              <div class="msg msg-user">Explain Stokes' theorem with a visual proof</div>
+              <div class="msg msg-system">
+                <span class="msg-dot pulsing"></span>
+                Generating · 3 scenes · ~45s
+              </div>
+              <div class="msg msg-done">
+                Done. 4 scenes rendered.
+                <span class="msg-tag">2:14</span>
+                <span class="msg-tag">1080p</span>
+              </div>
+              <div class="msg msg-user" style="margin-top:8px">Now show it in 3D perspective</div>
+              <div class="msg msg-system">Queued · estimated 30s</div>
+            </div>
+            <div class="panel-input-wrap">
+              <input type="text" class="panel-input" placeholder="continue the conversation…" />
+            </div>
+          </div>
+
+          <!-- Right panel -->
+          <div class="panel-right">
+            <div class="panel-video-header">
+              <span class="panel-label">PREVIEW</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span class="panel-label" style="color:var(--t-3)">2:14 · 1080p · Vivacity-1</span>
+                <button class="dph-btn">export</button>
+              </div>
+            </div>
+            <div class="panel-video-area">
+              <svg viewBox="0 0 560 315" class="math-svg">
+                <line x1="40" y1="275" x2="520" y2="275" stroke="rgba(255,255,255,0.14)" stroke-width="0.8" />
+                <line x1="40" y1="275" x2="40" y2="30" stroke="rgba(255,255,255,0.14)" stroke-width="0.8" />
+                <line x1="40" y1="275" x2="10" y2="300" stroke="rgba(255,255,255,0.08)" stroke-width="0.8"
+                  stroke-dasharray="3,3" />
+                <text x="526" y="279" class="svg-label">x</text>
+                <text x="32" y="26" class="svg-label">z</text>
+                <text x="4" y="304" class="svg-label">y</text>
+                <path d="M120,200 C140,100 260,80 340,140 C400,180 420,220 400,240 C370,260 280,270 200,250 Z"
+                  stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="rgba(255,255,255,0.025)" />
+                <path d="M140,220 C160,130 260,110 330,155" stroke="rgba(255,255,255,0.07)" stroke-width="0.8"
+                  fill="none" />
+                <path d="M160,235 C190,145 290,120 360,170" stroke="rgba(255,255,255,0.07)" stroke-width="0.8"
+                  fill="none" />
+                <path d="M180,210 C180,140 210,120 260,130" stroke="rgba(255,255,255,0.06)" stroke-width="0.8"
+                  fill="none" />
+                <path d="M120,200 C140,100 260,80 340,140 C400,180 420,220 400,240 C370,260 280,270 200,250 Z"
+                  stroke="rgba(237,237,237,0.5)" stroke-width="1.5" fill="none" stroke-dasharray="6,4" />
+                <line x1="260" y1="175" x2="260" y2="110" stroke="rgba(232,224,208,0.65)" stroke-width="1.2" />
+                <polygon points="260,105 256,116 264,116" fill="rgba(232,224,208,0.65)" />
+                <text x="265" y="108" class="svg-label svg-accent">n</text>
+                <text x="265" y="175" class="svg-label">S</text>
+                <text x="122" y="194" class="svg-label">∂S</text>
+              </svg>
+            </div>
+            <div class="panel-scrubber-row">
+              <button class="vc-ctrl-sm">&#9654;</button>
+              <div class="scrubber-track">
+                <div class="scrubber-fill" style="width:45%"></div>
+              </div>
+              <span class="scrubber-time">01:02 / 02:14</span>
+              <div class="panel-ctrls">
+                <span>share</span><span class="ctrl-sep">·</span><span>regenerate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PRICING ════════════════════════════════ -->
+  <section class="pricing-section reveal-section" id="pricing">
+    <div class="content-wrap">
+      <h2 class="section-h2">Pricing.</h2>
+      <div class="section-sub">FREE TO START · SCALE WHEN YOU NEED · BILLED IN RUPEES</div>
+
+      <div class="pricing-grid">
+
+        <!-- Plan 1 -->
+        <div class="plan-card">
+          <div class="plan-head">
+            <div class="plan-name">FREEMIUM</div>
+            <div class="plan-price">₹0<span>/mo</span></div>
+            <div class="plan-desc">For students and casual use (with ads).</div>
+          </div>
+          <div class="plan-features">
+            <div class="pf-item"><span class="pf-dot"></span> 10 renders per month</div>
+            <div class="pf-item"><span class="pf-dot"></span> Standard queue priority</div>
+            <div class="pf-item"><span class="pf-dot"></span> 720p output resolution</div>
+            <div class="pf-item"><span class="pf-dot"></span> Supported by unobtrusive ads</div>
+          </div>
+          <button class="plan-btn">Start Free</button>
+        </div>
+
+        <!-- Plan 2 -->
+        <div class="plan-card plan-card--pro">
+          <div class="plan-tag">MOST USED</div>
+          <div class="plan-name">PRO</div>
+          <div class="plan-price-row"><span class="plan-price">₹1,579</span><span class="plan-period">/ mo</span></div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li>200 renders per month</li>
+            <li>4K export</li>
+            <li>Custom voice model</li>
+            <li>API access</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="#" class="plan-btn plan-btn--primary">get pro</a>
+        </div>
+
+        <div class="plan-card">
+          <div class="plan-name">API</div>
+          <div class="plan-price-row"><span class="plan-price plan-price--sm">usage-based</span></div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li>No monthly cap</li>
+            <li>Billed post-cycle</li>
+            <li>Webhook support</li>
+            <li>SLA guarantee</li>
+            <li>Dedicated contact</li>
+          </ul>
+          <a href="#" class="plan-btn plan-btn--ghost">contact us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FAQ ════════════════════════════════════ -->
+  <section class="faq-section" id="faq">
+    <div class="content-wrap faq-wrap">
+      <h2 class="section-h2">Questions.</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary class="faq-q">How does Vivacity generate videos?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">A prompt enters the pipeline, interpreted by a language model that maps intent to Manim scene
+            primitives. The Code2Video framework writes valid Python/Manim code, reviewed by a critic model before
+            rendering. WhisperX syncs the voiceover to animation keyframes at the phoneme level. End-to-end: under 90
+            seconds.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">What subjects does it cover?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">Mathematics and physics at undergraduate and competitive exam level. Chemistry and computer
+            science are in active development. Full subject list in the docs.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">Can I use this for teaching at scale?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">Yes. Pro and API tiers support bulk generation and LMS embedding. Contact us for
+            institutional pricing if you're a coaching institute or university.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">Is the output downloadable?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">Student tier and above produce clean downloads at 1080p or 4K. Free and Supported tiers
+            produce watermarked exports.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">What is the API tier?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">Programmatic access to the full pipeline. Billed after your usage cycle. No monthly cap.
+            Designed for platforms integrating generated content at scale.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">How precise is the audio-visual sync?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">WhisperX aligns voiceover to animation at phoneme-level precision. This is Vivacity's primary
+            technical differentiator - the sync is mathematically computed, not approximated.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">How is this different from using Manim manually?<span class="faq-chevron"></span>
+          </summary>
+          <p class="faq-a">Manim requires Python expertise and hours of per-video coding. Vivacity abstracts prompt →
+            scene graph → render → audio sync → export. The delta is roughly 4 hours versus 90 seconds for an equivalent
+            2-minute video.</p>
+        </details>
+        <details class="faq-item">
+          <summary class="faq-q">Is my content private?<span class="faq-chevron"></span></summary>
+          <p class="faq-a">Paid tier outputs are private by default. Free tier outputs may be used to improve the model
+            unless you opt out in settings.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FOOTER ════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer-inner content-wrap">
+      <div class="footer-cols">
+        <div class="footer-col footer-col--brand">
+          <div class="footer-logo">V.</div>
+          <p class="footer-desc">AI video generation for mathematical reasoning.</p>
+          <span class="footer-copy">© 2025 PaXus Labs. vivacity.dev</span>
+          <div class="social-links">
+            <a href="https://youtube.com/@vivacity-paxus?si=_fRgvHPhwhag0_EQ" target="_blank" aria-label="YouTube">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21.582,6.186c-0.23-0.86-0.908-1.538-1.768-1.768C18.254,4,12,4,12,4S5.746,4,4.186,4.418 c-0.86,0.23-1.538,0.908-1.768,1.768C2,7.746,2,12,2,12s0,4.254,0.418,5.814c0.23,0.86,0.908,1.538,1.768,1.768 C5.746,20,12,20,12,20s6.254,0,7.814-0.418c0.861-0.23,1.538-0.908,1.768-1.768C22,16.254,22,12,22,12S22,7.746,21.582,6.186z M10,15.464V8.536L16,12L10,15.464z"/></svg>
+            </a>
+            <a href="https://www.instagram.com/tryvivacity?igsh=OTZucWhraTQyb2Fs" target="_blank" aria-label="Instagram">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <div class="fcol-head">PRODUCT</div>
+          <nav class="fcol-links">
+            <a href="#interface">features</a>
+            <a href="#pricing">pricing</a>
+            <a href="#examples">examples</a>
+            <a href="docs.html">api</a>
+          </nav>
+        </div>
+        <div class="footer-col">
+          <div class="fcol-head">DOCS</div>
+          <nav class="fcol-links">
+            <a href="docs.html">introduction</a>
+            <a href="docs.html#quickstart">quick start</a>
+            <a href="docs.html#api">api reference</a>
+            <a href="docs.html#changelog">changelog</a>
+          </nav>
+        </div>
+        <div class="footer-col">
+          <div class="fcol-head">COMPANY</div>
+          <nav class="fcol-links">
+            <a href="about.html">about</a>
+            <a href="research.html">research</a>
+            <a href="privacy.html">privacy policy</a>
+            <a href="terms.html">terms of service</a>
+          </nav>
+        </div>
+      </div>
+      <div class="footer-wordmark" aria-hidden="true">vivacity</div>
+    </div>
+  </footer>
+
+  <div class="cookie-banner" id="cookieBanner">
+    <div class="cb-inner">
+      <div class="cb-text">
+        <span class="cb-strong">Cookie Notice</span><br />
+        We use essential cookies to manage your sessions and performance cookies to understand how researchers use our
+        platform. By continuing to use Vivacity, you agree to our <a href="privacy.html">Privacy Policy</a>.
+      </div>
+      <div class="cb-actions">
+        <button class="cb-btn cb-btn-secondary" id="cbDeny">Deny</button>
+        <button class="cb-btn" id="cbAccept">Accept & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,17 @@
+WhatsApp Video*.mp4
+dda7cfa1*.mp4
+demo-sphere.mp4
+demo-manim.mp4
+video-*.mp4
+image.png
+
+.vercel
+client_secret_*.json
+
+# Backend
+backend/.env
+backend/outputs/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+backend/node_modules/
