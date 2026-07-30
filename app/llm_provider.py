@@ -518,7 +518,7 @@ def _build_provider(provider: str) -> LLMProvider:
 
 
 def get_llm_provider(provider_name: str | None = None) -> LLMProvider:
-    primary_name = (provider_name or os.getenv("LLM_PROVIDER", "anthropic")).strip().lower()
+    primary_name = (provider_name or os.getenv("LLM_PROVIDER", "gemini")).strip().lower()
     failover_enabled = os.getenv("LLM_PROVIDER_FAILOVER", "1").strip().lower() not in {"0", "false", "no"}
     fallback_names = [
         item.strip().lower()

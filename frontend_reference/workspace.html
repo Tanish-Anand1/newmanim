@@ -260,14 +260,12 @@ function buildStoryboard(topic, duration) {
   const secsPerBeat = Math.max(5, Math.round(duration / 5));
   let sb = `# Topic: ${t}\n`;
   const beats = [
-    `${t} concept with variables`,
-    `Formula KE = half m v squared relation`,
-    `Example with m = 2 and v = 3`,
-    `Graph showing relation between variables`,
-    `Edge case when variable is zero`,
-    `Active recall try different values`
+    `${t} concept`,
+    `Formula relation`,
+    `Example calculation`,
+    `Active recall`
   ];
-  const numBeats = Math.min(6, Math.max(4, Math.round(duration / secsPerBeat)));
+  const numBeats = Math.min(4, Math.max(3, Math.round(duration / secsPerBeat)));
   for (let i = 0; i < numBeats && i < beats.length; i++) {
     const start = i * secsPerBeat;
     const end = (i + 1) * secsPerBeat;
@@ -277,12 +275,24 @@ function buildStoryboard(topic, duration) {
 }
 
 async function pollJob(jobId) {
-  const maxPolls = 120;
+  const maxPolls = 60;
   for (let i = 0; i < maxPolls; i++) {
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 5000));
     try {
       const res = await fetch(API + '/api/jobs/' + jobId);
+      if (!res.ok) {
+        if (res.status === 404) {
+          showError('Job was lost due to server restart. Render free tier resets the database on cold starts. Please try again or add PostgreSQL.');
+          setStatus('Lost');
+          document.getElementById('sendBtn').disabled = false;
+          document.getElementById('sendBtn').textContent = 'Generate';
+          hideProgress();
+          return;
+        }
+        throw new Error('HTTP ' + res.status);
+      }
       const job = await res.json();
+      if (!job || !job.status) continue;
       const s = job.status;
       setStatus(s.charAt(0).toUpperCase() + s.slice(1));
       
@@ -307,9 +317,13 @@ async function pollJob(jobId) {
         return;
       }
     } catch (e) {
-      // retry
+      if (e.message && e.message.includes('Lost')) return;
     }
   }
+  showError('Render timed out. The free tier is too slow for this video. Try a shorter duration or add PostgreSQL.');
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('sendBtn').textContent = 'Generate';
+  hideProgress();
 }
 
 function onComplete(job) {
