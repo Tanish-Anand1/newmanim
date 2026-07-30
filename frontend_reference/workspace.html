@@ -178,6 +178,11 @@ body { font-family: 'Inter', sans-serif; background: #050505; color: #fff; heigh
 </div>
 
 <script>
+// Production backend URL (Render) - change this to your Render URL
+const PROD_API_URL = 'https://vivacity-api.onrender.com';
+// Use relative URL when on same origin (localhost), otherwise use Render
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? '' : PROD_API_URL;
+
 const API = '';  // same origin
 let currentJobId = null;
 let currentVideoUrl = null;
