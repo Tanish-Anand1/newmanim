@@ -68,7 +68,7 @@ ENABLE_REQUEST_DEDUPLICATION = os.getenv("ENABLE_REQUEST_DEDUPLICATION", "1").st
     "no",
 }
 PIPELINE_VERSION = os.getenv("PIPELINE_VERSION", "template-v1").strip() or "template-v1"
-ACTIVE_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").strip().lower()
+ACTIVE_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
 CHEAP_LLM_PROVIDER = os.getenv("CHEAP_LLM_PROVIDER", "openai").strip().lower()
 ACTIVE_TTS_PROVIDER = os.getenv("TTS_PROVIDER", "openai").strip().lower()
 ALLOW_LEGACY_PIPELINE = os.getenv("ALLOW_LEGACY_PIPELINE", "1").strip().lower() not in {"0", "false", "no"}
