@@ -8,8 +8,10 @@
     { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/", "dest": "/workspace.html" },
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/workspace", "dest": "/workspace.html" },
     { "src": "/editor", "dest": "/editor.html" },
+    { "src": "/signup", "dest": "/signup.html" },
     { "src": "/api/env", "dest": "/api/env.js" }
   ]
 }
