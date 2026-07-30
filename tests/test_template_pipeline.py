@@ -73,7 +73,10 @@ def test_template_pipeline_completes_and_persists_code(monkeypatch, tmp_path: Pa
     )
     monkeypatch.setattr(template_pipeline, "get_media_duration", lambda path: 1.0)
     monkeypatch.setattr(template_pipeline, "detect_frame_overflow", lambda *args, **kwargs: [])
+    monkeypatch.setattr(template_pipeline, "detect_text_overlap", lambda *args, **kwargs: [])
     monkeypatch.setattr(template_pipeline, "detect_sparse_frames", lambda *args, **kwargs: [])
+    monkeypatch.setattr(template_pipeline, "detect_temporal_cuts", lambda *args, **kwargs: [])
+    monkeypatch.setattr(template_pipeline, "assert_delivery_file_clean", lambda *args, **kwargs: None)
     monkeypatch.setattr(template_pipeline, "upload_video", lambda final_path, job_id: "/outputs/final.mp4")
 
     template_pipeline.run_template_pipeline_for_job(
@@ -86,5 +89,5 @@ def test_template_pipeline_completes_and_persists_code(monkeypatch, tmp_path: Pa
         completed = db.get(Job, job_id)
         assert completed.status == JobStatus.complete
         assert completed.output_video_url == "/outputs/final.mp4"
-        assert "class TemplateScene(Scene):" in completed.generated_code
+        assert "class TemplateScene(VivacityScene):" in completed.generated_code
         assert completed.cost_breakdown["anthropic"]["calls"] == 1

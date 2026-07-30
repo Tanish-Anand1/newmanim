@@ -6,6 +6,7 @@ import app.pipeline as pipeline
 from app.llm_provider import LLMResponse
 from app.models import Job, SessionLocal, init_db
 from sqlalchemy import text
+import pytest
 
 
 VALID_SCENE_CODE = """from manim import *
@@ -291,12 +292,15 @@ def test_validation_subloop_exhaustion_advances_to_next_outer_attempt(monkeypatc
         "render_scene",
         lambda scene_file, scene_name, work_dir, orientation="portrait", timeout_seconds=None: (True, ""),
     )
+    monkeypatch.setattr(pipeline, "render_scene_for_job", lambda *args, **kwargs: (True, ""))
     monkeypatch.setattr(pipeline, "find_rendered_video", lambda work_dir, scene_name: video_path)
     monkeypatch.setattr(pipeline, "get_media_duration", lambda path: 1.0)
     monkeypatch.setattr(pipeline, "text_lifecycle_feedback", lambda beats, code: None)
     monkeypatch.setattr(pipeline, "should_run_vision_quality_check", lambda job_id, manual_requested=False: True)
     monkeypatch.setattr(pipeline, "stretch_audio_to_duration", lambda audio_path, target_duration, out_path: out_path.write_bytes(b"audio"))
     monkeypatch.setattr(pipeline, "mux_audio_video", lambda video_path, audio_path, out_path: out_path.write_bytes(b"video"))
+    monkeypatch.setattr(pipeline, "assert_delivery_file_clean", lambda path: None)
+    monkeypatch.setattr(pipeline, "assert_rendered_video_clean", lambda *args, **kwargs: None)
     monkeypatch.setattr(pipeline, "upload_video", lambda final_path, job_id: "/outputs/final.mp4")
 
     def fake_generate_valid(**kwargs):
@@ -355,11 +359,14 @@ def test_mocked_pipeline_job_records_active_provider_cost(monkeypatch, tmp_path:
             "render_scene",
             lambda scene_file, scene_name, work_dir, orientation="portrait", timeout_seconds=None: (True, ""),
         )
+        monkeypatch.setattr(pipeline, "render_scene_for_job", lambda *args, **kwargs: (True, ""))
         monkeypatch.setattr(pipeline, "find_rendered_video", lambda work_dir, scene_name, video_path=video_path: video_path)
         monkeypatch.setattr(pipeline, "get_media_duration", lambda path: 1.0)
         monkeypatch.setattr(pipeline, "assess_video_quality", lambda provider, video_path, beats, out_dir, db=None, job_id=None: [])
         monkeypatch.setattr(pipeline, "stretch_audio_to_duration", lambda audio_path, target_duration, out_path: out_path.write_bytes(b"audio"))
         monkeypatch.setattr(pipeline, "mux_audio_video", lambda video_path, audio_path, out_path: out_path.write_bytes(b"video"))
+        monkeypatch.setattr(pipeline, "assert_delivery_file_clean", lambda path: None)
+        monkeypatch.setattr(pipeline, "assert_rendered_video_clean", lambda *args, **kwargs: None)
         monkeypatch.setattr(pipeline, "upload_video", lambda final_path, job_id: f"/outputs/{provider_name}.mp4")
 
         pipeline.run_pipeline_for_job(
@@ -1268,6 +1275,7 @@ class ContinuityScene(Scene):
         self.play(FadeOut(diagram2), run_time=0.5)
 """
 
+
     try:
         pipeline.validate_generated_python(code)
     except SyntaxError as exc:
@@ -1275,6 +1283,82 @@ class ContinuityScene(Scene):
         assert "leaving a blank frame" in str(exc)
     else:
         raise AssertionError("Expected a non-final blank-frame transition to fail validation")
+
+
+def test_narration_timeline_rejects_short_render():
+    with pytest.raises(RuntimeError, match="shorter than the narration timeline"):
+        pipeline.validate_render_duration_for_narration(9.0, 10.0)
+
+
+def test_narration_timeline_allows_render_with_hold_time():
+    pipeline.validate_render_duration_for_narration(10.0, 9.0)
+
+
+def test_pendulum_fact_check_rejects_restoring_force_toward_pivot():
+    storyboard = (
+        '[0-4] ON SCREEN: Pendulum bob and force vectors | '
+        'VO: "The restoring force points toward the pivot."\n'
+    )
+    with pytest.raises(ValueError, match="tension points toward the pivot"):
+        pipeline.validate_storyboard_or_raise(storyboard)
+
+
+def test_pendulum_fact_check_rejects_towards_variant():
+    storyboard = (
+        '[0-4] ON SCREEN: Pendulum restoring force | '
+        'VO: "The restoring force pulls the bob back towards the pivot."\n'
+    )
+    with pytest.raises(ValueError, match="tension points toward the pivot"):
+        pipeline.validate_storyboard_or_raise(storyboard)
+
+
+def test_pendulum_fact_check_requires_equilibrium_direction():
+    storyboard = (
+        '[0-4] ON SCREEN: Pendulum bob and restoring force | '
+        'VO: "The restoring force brings the bob back."\n'
+    )
+    with pytest.raises(ValueError, match="equilibrium position"):
+        pipeline.validate_storyboard_or_raise(storyboard)
+
+
+def test_pendulum_fact_check_accepts_equilibrium_and_pivot_claims_separately():
+    storyboard = (
+        '[0-4] ON SCREEN: Pendulum tension and restoring force | '
+        'VO: "Tension points toward the pivot, while the restoring force points toward equilibrium at theta=0."\n'
+    )
+    beats = pipeline.validate_storyboard_or_raise(storyboard)
+    assert len(beats) == 1
+
+
+def test_rendered_beat_windows_scale_to_actual_video_duration():
+    beats = [
+        pipeline.TimedBeat(SimpleNamespace(index=1), None, 4.0, 0.0),
+        pipeline.TimedBeat(SimpleNamespace(index=2), None, 6.0, 0.0),
+    ]
+    windows = pipeline.timed_beat_windows(beats, rendered_duration=12.0)
+    assert windows == [
+        {"beat_number": 1, "start": 0.0, "end": 4.8},
+        {"beat_number": 2, "start": 4.8, "end": 12.0},
+    ]
+
+
+def test_narration_pacing_rejects_fast_clip():
+    with pytest.raises(RuntimeError, match="Narration is too fast"):
+        pipeline.validate_narration_pacing("one two three four five six", 1.0)
+
+
+def test_narration_pacing_accepts_teaching_rate():
+    wpm = pipeline.validate_narration_pacing("one two three four five six", 3.0)
+    assert wpm == pytest.approx(120.0)
+
+
+def test_validate_generated_python_rejects_direct_text_mount():
+    code = VALID_SCENE_CODE.replace(
+        "self.play(FadeIn(diagram), run_time=beat1_speed)",
+        'self.add(Text("sudden caption"))',
+    )
+    with pytest.raises(SyntaxError, match="mounts rendered text with self.add"):
+        pipeline.validate_generated_python(code)
 
 
 def test_validate_generated_python_rejects_operational_spec_copied_as_caption():

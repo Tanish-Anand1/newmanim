@@ -3,13 +3,15 @@ import hashlib
 import json
 import os
 import re
+import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, text
@@ -18,7 +20,16 @@ from sqlalchemy.orm import Session
 
 from app.learning import learning_summary
 from app.job_queue import execution_mode
-from app.models import Job, JobStatus, RecallResponse as RecallResponseRecord, SessionLocal, get_db, init_db
+from app.llm_provider import get_llm_provider
+from app.models import (
+    Job,
+    JobStatus,
+    RecallResponse as RecallResponseRecord,
+    VideoProblemReport,
+    SessionLocal,
+    get_db,
+    init_db,
+)
 from app.operations import production_summary
 from app.prerequisite_gate import StudentSignal
 from app.pipeline import (
@@ -122,6 +133,15 @@ class StoryboardDraftResponse(BaseModel):
     cost_breakdown: dict[str, Any]
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(..., min_length=1, max_length=20_000)
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(default_factory=list, max_length=20)
+
+
 class RecallResponse(BaseModel):
     student_id: str = Field(..., min_length=1, max_length=120)
     question_id: str = Field(..., min_length=1, max_length=120)
@@ -130,6 +150,16 @@ class RecallResponse(BaseModel):
 
 class RecallResponseResult(BaseModel):
     correct: bool
+
+
+class ProblemReportRequest(BaseModel):
+    student_id: str | None = Field(None, max_length=120)
+    category: str = Field("video_quality", min_length=1, max_length=80)
+    details: str = Field(..., min_length=1, max_length=5000)
+
+
+class ProblemReportResult(BaseModel):
+    accepted: bool
 
 
 class GenerateResponse(BaseModel):
@@ -200,8 +230,10 @@ class PublicJobResponse(BaseModel):
     parent_job_id: str | None
     edited_beat_number: int | None
     failure_code: str | None
+    error: str | None = None
     beats: list[PublicBeatSummary]
     practice_questions: list[dict[str, Any]] | None = None
+    recall_question: dict[str, Any] | None = None
 
 
 class InternalJobResponse(BaseModel):
@@ -292,6 +324,17 @@ app.add_middleware(
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=str(OUTPUT_DIR)), name="outputs")
 
+# Serve frontend static files under /app/ path
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend_reference"
+if FRONTEND_DIR.exists():
+    app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
+
+@app.get("/")
+def root_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/app/workspace.html")
+
 
 @app.get("/health/live")
 def health_live():
@@ -310,6 +353,35 @@ def health_ready(db: Session = Depends(get_db)):
         "default_pipeline_profile": DEFAULT_PIPELINE_PROFILE,
         "pipeline_version": PIPELINE_VERSION,
     }
+
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+    """Compatibility chat stream for the linked Vivacity workspace UI."""
+    conversation = "\n".join(
+        f"{message.role}: {message.content}" for message in request.messages[-20:]
+    )
+    provider = get_llm_provider(ACTIVE_LLM_PROVIDER)
+    response = provider.generate(
+        system=(
+            "You are Viva, a concise educational assistant for Vivacity. "
+            "Explain math and science clearly and recommend /video prompts when the user wants an animation."
+        ),
+        user_message=conversation or "Introduce yourself and ask what the student wants to learn.",
+        max_tokens=900,
+        model=configured_llm_model(ACTIVE_LLM_PROVIDER),
+    )
+
+    def chunks():
+        words = response.text.split(" ")
+        for index in range(0, len(words), 8):
+            token = " ".join(words[index:index + 8])
+            if index + 8 < len(words):
+                token += " "
+            yield f"data: {json.dumps({'token': token})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(chunks(), media_type="text/event-stream")
 
 
 def duration_seconds_for_job(job: Job) -> float | None:
@@ -423,8 +495,10 @@ def public_job_to_dict(job: Job) -> dict[str, Any]:
         "parent_job_id": job.parent_job_id,
         "edited_beat_number": job.edited_beat_number,
         "failure_code": public_failure_code(job),
+        "error": job.error,
         "beats": public_beats_for_job(job),
         "practice_questions": job.practice_questions,
+        "recall_question": (job.request_payload or {}).get("recall_question"),
     }
 
 
@@ -610,8 +684,22 @@ def create_generation_job(
     request: GenerateRequest,
     db: Session,
     idempotency_key: str | None = None,
+    user_id: str = "local-student",
 ) -> tuple[Job, bool, bool]:
     validate_generate_request(request)
+    # Check subscription quota before creating a job
+    from app.subscription import check_and_increment_quota, clamp_request_to_plan
+    quota = check_and_increment_quota(user_id, dry_run=True)
+    if not quota.allowed:
+        raise HTTPException(status_code=429, detail=quota.reason)
+    # Clamp request params to plan limits (silently downgrade, don't error)
+    clamped = clamp_request_to_plan(
+        user_id,
+        requested_duration=request.duration_seconds or 30,
+    )
+    if clamped.duration_seconds != (request.duration_seconds or 30):
+        request.duration_seconds = clamped.duration_seconds
+    check_and_increment_quota(user_id)  # actually increment after clamping
     if idempotency_key is not None:
         idempotency_key = idempotency_key.strip()
         if not idempotency_key or len(idempotency_key) > 255:
@@ -827,8 +915,49 @@ def record_recall_response(
     db.commit()
 
     if not correct:
-        queue_recall_followup(video_id, request.student_id)
+        try:
+            queue_recall_followup(video_id, request.student_id)
+        except Exception as exc:
+            # The answer is already persisted and immediate feedback must not
+            # become a 500 merely because the optional scheduler is offline.
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Recall follow-up could not be queued for video_id=%s student_id=%s: %s",
+                video_id,
+                request.student_id,
+                exc,
+            )
     return RecallResponseResult(correct=correct)
+
+
+@app.post("/videos/{video_id}/problem-report", response_model=ProblemReportResult)
+def record_video_problem_report(
+    video_id: str,
+    request: ProblemReportRequest,
+    db: Session = Depends(get_db),
+):
+    if db.get(Job, video_id) is None:
+        raise HTTPException(status_code=404, detail="Video not found.")
+    db.add(
+        VideoProblemReport(
+            video_id=video_id,
+            student_id=request.student_id,
+            category=request.category,
+            details=request.details,
+        )
+    )
+    db.commit()
+    import logging
+
+    logging.getLogger(__name__).warning(
+        "VIDEO_PROBLEM_REPORT video_id=%s student_id=%s category=%s details=%s",
+        video_id,
+        request.student_id or "anonymous",
+        request.category,
+        request.details,
+    )
+    return ProblemReportResult(accepted=True)
 
 
 @app.post("/api/generate/batch", response_model=BatchGenerateResponse)
@@ -1272,6 +1401,134 @@ def patch_beat_params(
 
     schedule_generation_job(background_tasks, child)
     return GenerateResponse(job_id=child.id)
+
+
+class AdvancedRenderRequest(BaseModel):
+    topic: str = Field(..., min_length=1, max_length=500)
+    orientation: Literal["portrait", "landscape"] = "portrait"
+    duration_seconds: int = Field(45, ge=20, le=120)
+
+
+@app.post("/api/render-advanced")
+def render_advanced_video(
+    request: AdvancedRenderRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Generate and render a high-quality custom Manim scene from any topic."""
+    from app.pipeline import WORK_ROOT
+    
+    job_id = str(uuid.uuid4())
+    work_dir = WORK_ROOT / job_id
+    work_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Use Gemini to generate a proper Manim scene
+    provider = get_llm_provider()
+    system = (
+        "You are a Manim scene generator. Generate COMPLETE, runnable Manim Python code "
+        "for a 720x1280 portrait educational video. "
+        "Rules:\n"
+        "- Use Text() for labels, MathTex() for equations, Axes/plot for graphs\n"
+        "- Portrait frame: config.frame_height=16, config.frame_width=9\n"
+        "- Always include from manim import * at top\n"
+        "- Subclass Scene, create ONE class called AdvancedScene\n"
+        "- Include 5-8 beats with Write/Create/FadeIn/FadeOut animations\n"
+        "- Show equations, plotted graphs, and step-by-step explanation\n"
+        "- End with an Active Recall question with 8-second countdown\n"
+        "- Total duration roughly {request.duration_seconds} seconds of animation\n"
+        "- Use color palette: #60a5fa (blue), #a78bfa (purple), #34d399 (green)\n"
+        "- Background color: #0a0a0f\n"
+        "- Return ONLY Python code in a ```python block"
+    )
+    user_msg = f"Generate a complete Manim scene explaining: {request.topic}\nOrientation: {request.orientation}"
+    
+    try:
+        response = provider.generate(
+            system=system,
+            user_message=user_msg,
+            max_tokens=8000,
+        )
+        raw = response.text
+        # Extract code from ```python block
+        code_match = re.search(r"```python\s*([\s\S]+?)```", raw)
+        if code_match:
+            code = code_match.group(1).strip()
+        else:
+            code = raw.strip()
+        
+        scene_file = work_dir / "advanced_scene.py"
+        scene_file.write_text(code, encoding="utf-8")
+        
+        def render_task():
+            import subprocess, sys as _sys
+            media_dir = work_dir / "media"
+            cmd = [
+                _sys.executable, "-m", "manim",
+                str(scene_file), "AdvancedScene",
+                "--media_dir", str(media_dir),
+                "-qh", "--format=mp4", "--fps", "30",
+                "--resolution", "720,1280",
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if result.returncode != 0:
+                raise RuntimeError(f"Manim render failed: {result.stderr[-500:]}")
+            
+            # Find the video file
+            videos = list(media_dir.rglob("*.mp4"))
+            if not videos:
+                raise FileNotFoundError("No video generated")
+            
+            video_path = max(videos, key=lambda p: p.stat().st_mtime)
+            
+            # Copy to outputs
+            from app.storage import OUTPUT_DIR
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            final_path = OUTPUT_DIR / f"{job_id}_{request.topic[:20]}_ADVANCED.mp4"
+            import shutil
+            shutil.copy2(video_path, final_path)
+            
+            # Update the job record
+            from app.models import SessionLocal, Job
+            with SessionLocal() as db:
+                job = db.get(Job, job_id)
+                if job:
+                    job.status = JobStatus.complete
+                    job.output_video_url = f"/outputs/{final_path.name}"
+                    job.progress_message = "Video generation complete."
+                    db.commit()
+        
+        # Create a job record
+        db = SessionLocal()
+        try:
+            job = Job(
+                id=job_id,
+                status=JobStatus.queued,
+                progress_message="Generating advanced scene...",
+                scene_name="AdvancedScene",
+                orientation=request.orientation,
+                llm_provider=provider.name,
+                llm_model="gemini-2.5-flash",
+                job_kind="advanced_render",
+                request_payload={"topic": request.topic},
+            )
+            db.add(job)
+            db.commit()
+        finally:
+            db.close()
+        
+        background_tasks.add_task(render_task)
+        return {"job_id": job_id}
+        
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/webhooks/revenuecat")
+async def revenuecat_webhook(request: Request):
+    """Receive RevenueCat webhook events and update user subscriptions."""
+    payload = await request.json()
+    from app.subscription import handle_revenuecat_webhook
+    result = handle_revenuecat_webhook(payload)
+    return {"status": "processed", "event": result}
 
 
 @app.get("/api/jobs/{job_id}/stream")

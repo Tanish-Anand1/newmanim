@@ -118,6 +118,33 @@ class RecallResponse(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
 
 
+class VideoProblemReport(Base):
+    __tablename__ = "video_problem_reports"
+    __table_args__ = (Index("ix_video_problem_reports_video", "video_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    video_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    student_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    category: Mapped[str] = mapped_column(String(80), nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class UserSubscription(Base):
+    __tablename__ = 'user_subscriptions'
+    __table_args__ = ()
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
+    plan_tier: Mapped[str] = mapped_column(String(20), nullable=False, default='free')
+    billing_cycle_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    renders_this_cycle: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_reset: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    razorpay_subscription_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     if DATABASE_URL.startswith("sqlite"):
@@ -213,6 +240,12 @@ def ensure_sqlite_columns() -> None:
         )
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_completed_at ON jobs (completed_at)"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_dead_lettered_at ON jobs (dead_lettered_at)"))
+        connection.execute(text("CREATE TABLE IF NOT EXISTS user_subscriptions ("
+            "id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(120) NOT NULL UNIQUE, plan_tier VARCHAR(20) NOT NULL DEFAULT 'free',"
+            "billing_cycle_start DATETIME, renders_this_cycle INTEGER NOT NULL DEFAULT 0, last_reset DATETIME,"  
+            "razorpay_subscription_id VARCHAR(120), created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL"
+           ")"))
+        # Index is already defined in UserSubscription.__table_args__
 
 
 def get_db():

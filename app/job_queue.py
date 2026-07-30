@@ -8,7 +8,7 @@ import time
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select, update, case
 
 from app.models import Job, JobStatus, SessionLocal, engine, init_db, utc_now
 
@@ -55,7 +55,9 @@ def claim_next_job(worker_id: str, lease_seconds: int) -> str | None:
                 job.worker_id = worker_id
                 job.lease_expires_at = lease_until
                 job.last_heartbeat_at = now
-                job.started_at = job.started_at or now
+                if job.started_at is None:
+                    job.started_at = now
+                    job.attempt_number += 1
                 job.progress_message = "Starting queued video job."
                 return job.id
 
@@ -82,7 +84,14 @@ def claim_next_job(worker_id: str, lease_seconds: int) -> str | None:
                     worker_id=worker_id,
                     lease_expires_at=lease_until,
                     last_heartbeat_at=now,
-                    started_at=func.coalesce(Job.started_at, now),
+                    started_at=case(
+                        (Job.started_at.is_(None), now),
+                        else_=Job.started_at
+                    ),
+                    attempt_number=case(
+                        (Job.started_at.is_(None), Job.attempt_number + 1),
+                        else_=Job.attempt_number
+                    ),
                     progress_message="Starting queued video job.",
                 )
             )

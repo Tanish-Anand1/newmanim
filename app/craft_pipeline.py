@@ -1,6 +1,9 @@
 import os
 import json
 import logging
+import re
+import random
+import hashlib
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -12,6 +15,7 @@ from app.pipeline import (
     MAX_TOKENS,
     codegen_model_for_attempt,
     parse_storyboard,
+    replace_storyboard_beat,
     update_job,
     timed_stage,
 )
@@ -20,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class CraftBeatPlan(BaseModel):
     beat_number: int
-    shape: str = Field(description="The template shape: INTRODUCE_CONCEPT, TRANSFORM_EQUATION, COMPARE_SIDE_BY_SIDE, PLOT_MATH_CURVE, or NONE")
+    shape: str = Field(description="The template shape: INTRODUCE_CONCEPT, TRANSFORM_EQUATION, COMPARE_SIDE_BY_SIDE, PLOT_MATH_CURVE, PLOT_DICE_DISTRIBUTION, or NONE")
     param_title: Optional[str] = None
     param_text: Optional[str] = None
     param_old_eq: Optional[str] = None
@@ -33,11 +37,67 @@ class CraftBeatPlan(BaseModel):
 class CraftVideoPlan(BaseModel):
     beats: List[CraftBeatPlan]
 
+
+def generate_dice_rolls(count: int = 6, seed: int | str = 0) -> list[int]:
+    """Generate the one dice sequence shared by narration and Manim."""
+    if count != 6:
+        raise ValueError("CLT dice visualization requires exactly six dice")
+    if isinstance(seed, str):
+        compact = seed.replace("-", "")
+        try:
+            numeric_seed = int(compact[:16], 16)
+        except ValueError:
+            numeric_seed = int.from_bytes(hashlib.sha256(seed.encode("utf-8")).digest()[:8], "big")
+    else:
+        numeric_seed = int(seed)
+    rng = random.Random(numeric_seed)
+    return [rng.randint(1, 6) for _ in range(count)]
+
+
+def _escape_latex_backslashes_in_json(json_text: str) -> str:
+    """Protect LaTeX commands before JSON parsing.
+
+    JSON treats ``\\t``, ``\\n`` and similar sequences as control-character
+    escapes. LLM-generated craft plans commonly contain LaTeX commands such
+    as ``\\text`` and ``\\theta`` in JSON strings; parsing those first turns
+    them into tabs/newlines and corrupts the generated Manim source.
+    """
+    latex_commands = (
+        "text", "left", "right", "frac", "sqrt", "sum", "int", "sin",
+        "cos", "tan", "log", "ln", "pi", "theta", "alpha", "beta",
+        "gamma", "delta", "cdot", "times", "leq", "geq", "neq",
+        "infty", "approx", "angle", "partial", "nabla", "mu", "sigma",
+        "lambda", "omega", "quad", "qquad", ",", ";", ":", "!",
+    )
+    # Repair only a single backslash. Already escaped JSON sequences
+    # (``\\\\text``) must remain unchanged.
+    repaired: list[str] = []
+    index = 0
+    while index < len(json_text):
+        if json_text[index] != "\\":
+            repaired.append(json_text[index])
+            index += 1
+            continue
+        if index + 1 < len(json_text) and json_text[index + 1] == "\\":
+            repaired.append("\\\\")
+            index += 2
+            continue
+        command = next(
+            (value for value in latex_commands if json_text.startswith(value, index + 1)),
+            None,
+        )
+        if command is not None:
+            repaired.append("\\\\")
+        else:
+            repaired.append("\\")
+        index += 1
+    return "".join(repaired)
+
 def craft_plan_schema_prompt() -> str:
     return (
         "Return one JSON object only, with no Markdown or commentary. The shape is: "
         '{"beats":[{"beat_number":1,"shape":"INTRODUCE_CONCEPT","param_title":"Title","param_text":"Subtitle"}]}. '
-        "Allowed shape values: INTRODUCE_CONCEPT, TRANSFORM_EQUATION, COMPARE_SIDE_BY_SIDE, PLOT_MATH_CURVE, NONE. "
+        "Allowed shape values: INTRODUCE_CONCEPT, TRANSFORM_EQUATION, COMPARE_SIDE_BY_SIDE, PLOT_MATH_CURVE, PLOT_DICE_DISTRIBUTION, NONE. "
         "CRITICAL: You MUST map every single distinct step/beat of the input storyboard to a corresponding beat in the plan. "
         "Do NOT merge, skip, or truncate beats. The plan must cover the entire sequence from beginning to end. "
         "CRITICAL: Every mathematical step, calculation, substitution, and result in the storyboard MUST be mapped to TRANSFORM_EQUATION (or COMPARE_SIDE_BY_SIDE) to ensure it is rendered. Do NOT map active mathematical steps or calculations to NONE; NONE should only be used for silent pauses. "
@@ -49,6 +109,7 @@ def craft_plan_schema_prompt() -> str:
         "For TRANSFORM_EQUATION, provide param_old_eq, param_new_eq, and optionally param_title (as a heading). "
         "For COMPARE_SIDE_BY_SIDE, provide param_left_text, param_left_eq, param_right_text, param_right_eq, and optionally param_title. "
         "For PLOT_MATH_CURVE, use when we need to plot the calculus curve f(x)=x^3-3x^2+4 and show the tangent line, the shaded integral area, and the inscribed circle. Provide param_title as a heading. "
+        "For PLOT_DICE_DISTRIBUTION, use for Central Limit Theorem or dice topics: construct actual die faces, a persistent coordinate plane, and a histogram whose bars grow through repeated-sample stages. Do not replace this visual with a prose caption. "
         "Use valid LaTeX without $ delimiters for pure equations, but use $ delimiters for math inside mixed strings. "
         "If the beat does not fit these shapes exactly, use NONE."
     )
@@ -60,6 +121,7 @@ def generate_craft_plan(
     beat_numbers: List[int],
     db: Session,
     job_id: str,
+    topic: str | None = None,
 ) -> CraftVideoPlan:
     import re
 
@@ -111,7 +173,7 @@ def generate_craft_plan(
             )
             continue
 
-        json_str = text[start : end + 1]
+        json_str = _escape_latex_backslashes_in_json(text[start : end + 1])
         try:
             payload = json.loads(json_str)
         except json.JSONDecodeError:
@@ -126,6 +188,14 @@ def generate_craft_plan(
 
         try:
             plan = CraftVideoPlan.model_validate(payload)
+            if topic and "dice" in topic.casefold() and "PLOT_DICE_DISTRIBUTION" not in {
+                beat.shape for beat in plan.beats
+            }:
+                # Dice/CLT needs a genuine visual model even when the planner
+                # falls back to prose-oriented templates.
+                for beat in plan.beats:
+                    if beat.beat_number > 1 and beat.shape != "NONE":
+                        beat.shape = "PLOT_DICE_DISTRIBUTION"
             return plan
         except Exception as exc:
             logger.warning("Attempt %d: Pydantic validation failed: %s", attempt, exc)
@@ -140,6 +210,7 @@ def compile_craft_scene(
     orientation: str,
     plan: CraftVideoPlan,
     project_root: str,
+    dice_rolls: Optional[list[int]] = None,
 ) -> str:
     """Generates the Manim python code that executes the craft templates."""
     
@@ -147,9 +218,11 @@ def compile_craft_scene(
         "import sys",
         f"sys.path.insert(0, r'{project_root}')",
         "from manim import *",
-        "from app.craft_library import CraftContext, introduce_concept, transform_equation, compare_side_by_side, plot_math_curve_with_tangent_and_area",
+        "from vivacity_constants import BACKGROUND_COLOR, EQUATION_COLOR, PRIMARY_COLOR, SECONDARY_COLOR, MUTED_COLOR",
+        "from app.craft_library import CraftContext, introduce_concept, transform_equation, compare_side_by_side, plot_math_curve_with_tangent_and_area, plot_dice_distribution",
         "",
-        f"class {scene_name}(MovingCameraScene):",
+        "from vivacity_base_scene import VivacityScene",
+        f"class {scene_name}(VivacityScene):",
         "    def construct(self):",
         f"        ctx = CraftContext(self, orientation='{orientation}')",
         "",
@@ -186,6 +259,11 @@ def compile_craft_scene(
         elif beat.shape == "PLOT_MATH_CURVE":
             heading = repr(beat.param_title) if beat.param_title else "None"
             lines.append(f"        plot_math_curve_with_tangent_and_area(ctx, heading={heading})")
+
+        elif beat.shape == "PLOT_DICE_DISTRIBUTION":
+            heading = repr(beat.param_title) if beat.param_title else "None"
+            rolls = repr(dice_rolls) if dice_rolls is not None else "None"
+            lines.append(f"        plot_dice_distribution(ctx, heading={heading}, dice_rolls={rolls})")
         
         lines.append("")
         
@@ -213,7 +291,7 @@ def run_craft_pipeline_for_job(job_id: str, db: Session, work_dir, provider, job
     from app.preflight import run_preflight_gate, format_gate_report
 
     scene_name = f"CraftScene_{job_id.replace('-', '_')}"
-    orientation = "portrait"
+    orientation = getattr(job, "orientation", None) or "portrait"
 
     # ------------------------------------------------------------------ #
     # 1. Generate craft plan + compile Manim code                         #
@@ -225,10 +303,35 @@ def run_craft_pipeline_for_job(job_id: str, db: Session, work_dir, provider, job
     )
 
     beat_numbers = [b.index for b in beats]
-    plan = generate_craft_plan(provider, job.storyboard, orientation, beat_numbers, db, job_id)
+    topic = str((job.request_payload or {}).get("topic") or "")
+    plan = generate_craft_plan(provider, job.storyboard, orientation, beat_numbers, db, job_id, topic=topic)
+
+    dice_rolls = None
+    if "dice" in topic.casefold() or "central limit" in topic.casefold():
+        # One deterministic source of truth is persisted before codegen and
+        # consumed by both the scene and the narration timeline.
+        dice_rolls = generate_dice_rolls(seed=job_id)
+        payload = dict(job.request_payload or {})
+        payload["dice_rolls"] = dice_rolls
+        payload["dice_narration_text"] = "The six displayed dice are " + ", ".join(map(str, dice_rolls)) + "."
+        job.request_payload = payload
+        db.commit()
+        first_vo = next((beat for beat in beats if beat.vo_text), None)
+        if first_vo and "displayed dice are" not in first_vo.vo_text.lower():
+            first_vo.vo_text = f"{first_vo.vo_text.rstrip()} {payload['dice_narration_text']}"
+        if first_vo is None or payload["dice_narration_text"].lower() not in first_vo.vo_text.lower():
+            raise RuntimeError("Dice provenance check failed: narration does not contain rendered dice values")
+        if first_vo is not None:
+            job.storyboard = replace_storyboard_beat(
+                job.storyboard or "",
+                first_vo.index,
+                first_vo.on_screen_text,
+                first_vo.vo_text,
+            )
+            db.commit()
 
     project_root = str(Path(__file__).resolve().parent.parent)
-    code = compile_craft_scene(scene_name, orientation, plan, project_root)
+    code = compile_craft_scene(scene_name, orientation, plan, project_root, dice_rolls=dice_rolls)
     scene_file = write_job_scene_file(job_id, scene_name, code)
     persist_generated_code(db, job_id, code)
 

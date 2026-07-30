@@ -6,10 +6,19 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.frame_check import detect_frame_overflow, detect_sparse_frames, get_media_duration
+from app.frame_check import (
+    assert_delivery_file_clean,
+    detect_frame_overflow,
+    detect_sparse_frames,
+    detect_temporal_cuts,
+    detect_text_overlap,
+    get_media_duration,
+)
 from app.llm_provider import LLMProvider, ProviderUnavailableError
 from app.models import Job, JobStatus, SessionLocal
 from app.storage import upload_video
+
+POST_RENDER_SAMPLE_COUNT = int(os.getenv("POST_RENDER_SAMPLE_COUNT", "24"))
 from app.template_engine import (
     TemplateBeatInput,
     TemplateVideoPlan,
@@ -233,7 +242,14 @@ def run_template_pipeline_for_job(
             attempt_number=1,
         )
         with timed_stage(debug_log_path, "tts_generation_total"):
-            timed_beats = generate_timed_beat_audio(beats, work_dir / "audio", debug_log_path, db, job_id)
+            timed_beats = generate_timed_beat_audio(
+                beats,
+                work_dir / "audio",
+                debug_log_path,
+                db,
+                job_id,
+                tts_speed=0.70,
+            )
         audio_track = work_dir / f"{scene_name}_beats.mp3"
         with timed_stage(debug_log_path, "audio_concatenate"):
             concatenate_audio(timed_beats, work_dir / "audio", audio_track)
@@ -370,16 +386,26 @@ def run_template_pipeline_for_job(
             progress_message="Running deterministic frame-boundary checks.",
         )
         with timed_stage(debug_log_path, "template_frame_boundary_scan"):
-            overflow = detect_frame_overflow(video_path, work_dir / "boundary_samples")
+            overflow = detect_frame_overflow(video_path, work_dir / "boundary_samples", POST_RENDER_SAMPLE_COUNT)
         if overflow:
             first = overflow[0]
             raise RuntimeError(f"Visible content reached the frame boundary near {first.timestamp:.2f}s.")
+
+        with timed_stage(debug_log_path, "template_text_overlap_scan"):
+            text_overlap = detect_text_overlap(video_path, work_dir / "overlap_samples", POST_RENDER_SAMPLE_COUNT)
+        if text_overlap:
+            first = text_overlap[0]
+            raise RuntimeError(
+                "Rendered scene contains overlapping text or element bounds "
+                f"near {first.timestamp:.2f}s."
+            )
 
         with timed_stage(debug_log_path, "template_sparse_frame_scan"):
             rendered_windows = timed_beat_windows(timed_beats, video_duration)
             sparse_frames = detect_sparse_frames(
                 video_path,
                 work_dir / "sparse_samples",
+                sample_count=POST_RENDER_SAMPLE_COUNT,
                 beat_windows=[
                     (float(window["start"]), float(window["end"]))
                     for window in rendered_windows
@@ -390,6 +416,15 @@ def run_template_pipeline_for_job(
             raise RuntimeError(
                 "Rendered scene contains sustained nearly empty output "
                 f"near {first.timestamp:.2f}s (foreground ratio {first.foreground_pixel_ratio:.4f})."
+            )
+
+        with timed_stage(debug_log_path, "template_temporal_cut_scan"):
+            temporal_cuts = detect_temporal_cuts(video_path)
+        if temporal_cuts:
+            first = temporal_cuts[0]
+            raise RuntimeError(
+                "Rendered scene contains an abrupt frame transition "
+                f"near {first.timestamp:.2f}s (delta {first.mean_frame_delta:.3f})."
             )
 
         if should_run_vision_quality_check(job_id):
@@ -428,6 +463,7 @@ def run_template_pipeline_for_job(
         final_path = work_dir / f"{scene_name}_FINAL.mp4"
         with timed_stage(debug_log_path, "mux_audio_video"):
             mux_audio_video(video_path, corrected_audio, final_path)
+        assert_delivery_file_clean(final_path)
         with timed_stage(debug_log_path, "storage_upload"):
             output_url = upload_video(final_path, job_id)
 

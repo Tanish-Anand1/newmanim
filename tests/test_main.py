@@ -153,7 +153,8 @@ def test_public_job_response_hides_generated_storyboard():
 
     assert response.status_code == 200
     assert "generated_storyboard" not in response.json()
-    assert "error" not in response.json()
+    # error field is now exposed in the public API (None when no error)
+    assert response.json().get("error") is None
 
 
 def test_internal_job_response_includes_generated_storyboard(monkeypatch):

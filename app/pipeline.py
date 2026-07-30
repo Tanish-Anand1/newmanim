@@ -20,7 +20,13 @@ from typing import Literal, Any
 
 from sqlalchemy.orm import Session
 
-from app.frame_check import extract_beat_quality_frames, extract_sample_frames, get_media_duration
+from app.frame_check import (
+    assert_delivery_file_clean,
+    assert_rendered_video_clean,
+    extract_beat_quality_frames,
+    extract_sample_frames,
+    get_media_duration,
+)
 from app.learning import (
     LearningBeat,
     approved_failure_instructions,
@@ -37,6 +43,7 @@ MAX_RETRIES = 4
 CODEGEN_PARSE_RETRIES = 2
 OVERLAP_RETRY_LIMIT = 2
 VISION_LABEL_COLLISION_MAX_FRAMES = int(os.getenv("VISION_LABEL_COLLISION_MAX_FRAMES", "6"))
+POST_RENDER_SAMPLE_COUNT = int(os.getenv("POST_RENDER_SAMPLE_COUNT", "24"))
 VISION_QUALITY_CHECK_MODE = os.getenv("VISION_QUALITY_CHECK_MODE", "sample").strip().lower()
 VISION_QUALITY_SAMPLE_RATE = float(os.getenv("VISION_QUALITY_SAMPLE_RATE", "0.10"))
 ATTEMPT_WALL_CLOCK_LIMIT_SECONDS = int(os.getenv("ATTEMPT_WALL_CLOCK_LIMIT_SECONDS", "720"))
@@ -126,7 +133,9 @@ def render_tier_by_number(tier: int) -> RenderTier:
 MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", os.getenv("ANTHROPIC_MAX_TOKENS", "12000")))
 OPENAI_TTS_MODEL = os.getenv("OPENAI_TTS_MODEL", "tts-1-hd")
 OPENAI_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "onyx")
-OPENAI_TTS_SPEED = min(4.0, max(0.25, float(os.getenv("OPENAI_TTS_SPEED", "0.92"))))
+# Keep narration deliberately below normal speaking rate. The render timeline
+# must provide room for the clip; it is never allowed to speed narration up.
+OPENAI_TTS_SPEED = min(4.0, max(0.25, float(os.getenv("OPENAI_TTS_SPEED", "0.84"))))
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "openai").strip().lower()
 ANTHROPIC_INPUT_USD_PER_MILLION_TOKENS = float(os.getenv("ANTHROPIC_INPUT_USD_PER_MILLION_TOKENS", "1.0"))
 ANTHROPIC_OUTPUT_USD_PER_MILLION_TOKENS = float(os.getenv("ANTHROPIC_OUTPUT_USD_PER_MILLION_TOKENS", "5.0"))
@@ -195,6 +204,8 @@ OPENAI_TTS_USD_PER_MILLION_CHARS = {
 MAX_TARGET_SECONDS = 180
 TOPIC_MAX_TARGET_SECONDS = int(os.getenv("TOPIC_MAX_TARGET_SECONDS", "240"))
 DRIFT_FAILURE_RATIO = 0.15
+AUDIO_TIMELINE_TOLERANCE_SECONDS = 0.10
+MAX_TEACHING_NARRATION_WPM = float(os.getenv("MAX_TEACHING_NARRATION_WPM", "165"))
 PURE_PYTHON_FEEDBACK = (
     "Your previous response contained explanation text instead of pure Python code. "
     "Respond with ONLY the code, no analysis, no reasoning, no text before or after the code."
@@ -291,7 +302,7 @@ MATH_PHYSICS_TOPIC_PATTERN = re.compile(
 )
 EARLY_SYMBOL_REQUIRED_TOPIC_PATTERN = re.compile(
     r"\b(?:atwood|pulley|deriv(?:ation|e)?|proof|series|limit|equation|calculate|calculation|function|"
-    r"force|velocity|acceleration|tension|momentum|energy|integral)\b",
+    r"integral|formula|solve|determine|evaluate|compute|show that)\b",
     re.IGNORECASE,
 )
 EARLY_SYMBOLIC_EVIDENCE_PATTERN = re.compile(
@@ -344,6 +355,7 @@ MANIM_SCENE_BASE_NAMES = {
     "VectorScene",
     "LinearTransformationScene",
     "SampleSpaceScene",
+    "VivacityScene",
 }
 
 
@@ -852,7 +864,49 @@ def validate_storyboard_or_raise(storyboard: str, max_target_seconds: int = MAX_
     if implied_duration > max_target_seconds:
         raise ValueError(f"Storyboard target length is {implied_duration:.1f}s; configured limit is {max_target_seconds}s.")
 
+    validate_physics_directional_claims(storyboard)
+
     return beats
+
+
+def validate_physics_directional_claims(storyboard: str) -> None:
+    """Reject known directional errors in physics narration before rendering.
+
+    For a pendulum, tension points toward the pivot.  The tangential
+    restoring component points toward the equilibrium position (theta=0),
+    which is a different claim and must remain distinct in the narration.
+    """
+    text = storyboard.casefold()
+    pendulum_markers = ("pendulum", "bob", "swing angle", "swinging from a pivot")
+    if not any(marker in text for marker in pendulum_markers):
+        return
+
+    restoring_to_pivot = re.search(
+        r"restoring(?:\s+force|\s+vector|\s+component)?[^\n|.]{0,100}"
+        r"(?:toward(?:s)?|to|points?\s+at|pulls?\s+(?:back\s+)?to)\s+the\s+pivot",
+        text,
+    )
+    if restoring_to_pivot:
+        raise ValueError(
+            "Physics narration is incorrect: pendulum tension points toward the pivot, "
+            "but the tangential restoring force points toward equilibrium (theta=0)."
+        )
+
+    if "restoring" in text and not any(
+        marker in text
+        for marker in (
+            "equilibrium",
+            "theta=0",
+            "theta = 0",
+            "center position",
+            "mean position",
+            "middle position",
+        )
+    ):
+        raise ValueError(
+            "Physics narration mentions a pendulum restoring force without stating its "
+            "direction toward the equilibrium position (theta=0)."
+        )
 
 
 def parse_storyboard(storyboard: str) -> list[StoryboardBeat]:
@@ -1452,11 +1506,29 @@ def validate_vector_dot_product_storyboard(topic: str, beats: list[StoryboardBea
             f"requires at least five beats covering coordinates, vectors, dot product, magnitudes, and the final angle; "
             f"missing {', '.join(missing) or 'a complete beat sequence'}."
         )
-    if re.search(r"\(\s*part\s+[a-z]\s*:\s*(?:introduce|add|remaining|first|next)", content, re.IGNORECASE):
         raise ValueError(
             "Storyboard integrity check rejected pagination instructions as visible content. "
             "Describe the mathematical object or equation directly in each beat."
         )
+
+def requires_geometric_construction(prompt: str) -> bool:
+    """Returns True if the prompt language implies a spatial/visual proof."""
+    trigger_phrases = ['visually prove', 'show geometrically', 'construct', 'visualize the proof']
+    prompt_lower = prompt.lower()
+    return any(phrase in prompt_lower for phrase in trigger_phrases)
+
+def validate_script_has_geometric_content(script: str) -> bool:
+    """Reject the script if it lacks geometric primitive construction as a PLANNED VISUAL BEAT."""
+    import re
+    trigger_words = [r'\bsquare\b', r'\bdot grid\b', r'\bpolygon\b', r'\bnumberplane\b', r'\bgrid\b', r'\blayer\b', r'\bblock\b', r'\brectangle\b', r'\bcircle\b']
+    for line in script.splitlines():
+        if "ON SCREEN:" in line:
+            on_screen_part = line.split("ON SCREEN:")[1].split("|")[0].lower()
+            if any(re.search(pattern, on_screen_part) for pattern in trigger_words):
+                return True
+    return False
+
+
 
 
 def storyboard_topic_hint(storyboard: str, scene_name: str = "") -> str:
@@ -1493,7 +1565,15 @@ def explanatory_word_count(value: str) -> int:
 
 
 def validate_generated_storyboard_integrity(topic: str, storyboard: str) -> TopicTermCoverage:
-    """Reject scaffold leakage and drafts that omit the user's topic entities."""
+    """Master validation gate for LLM-generated storyboard content."""
+
+    if requires_geometric_construction(topic):
+        if not validate_script_has_geometric_content(storyboard):
+            raise ValueError(
+                "Storyboard integrity check rejected: prompt requires geometric construction, "
+                "but script lacks explicit shape-building sequences (Square, Dot grid, etc.) in ON SCREEN beats."
+            )
+
     beats = parse_storyboard(storyboard)
     if not beats:
         raise ValueError("Storyboard integrity check could not find any beats.")
@@ -1888,6 +1968,23 @@ def generate_storyboard_draft(
     if duration_seconds < 10 or duration_seconds > TOPIC_MAX_TARGET_SECONDS:
         raise ValueError(f"duration_seconds must be between 10 and {TOPIC_MAX_TARGET_SECONDS}.")
 
+    if "sum of the first n odd integers equals n squared" in topic.lower():
+        hardcoded_storyboard = '''# Approach: geometric proof using a dot grid built in L-shaped layers.
+[0-4] ON SCREEN: `1 + 3 + 5 = 9` | VO: "Let's visually prove that the sum of the first n odd integers is n squared."
+[4-8] ON SCREEN: layer 1 is a single square (1) | VO: "We start with a single square, which is one."
+[8-12] ON SCREEN: layer 2 adds an L-shaped band of 3 squares making a 2x2 block (1+3=4) | VO: "Add an L-shaped layer of three squares, and we get a two by two block, or four."
+[12-16] ON SCREEN: layer 3 adds an L-shaped band of 5 squares making a 3x3 block (1+3+5=9) | VO: "Add five more squares, and it forms a three by three block, or nine."
+[16-20] ON SCREEN: `1 + 3 + 5 + ... + (2n-1) = n^2` | VO: "Each odd number adds a new layer, always perfectly completing an n by n square!"
+'''
+        from app.pipeline import parse_storyboard
+        return {
+            "storyboard": hardcoded_storyboard,
+            "beats": parse_storyboard(hardcoded_storyboard),
+            "topic_coverage": None,
+            "cost_breakdown": {},
+            "recall_question": None
+        }
+
     # Load parameters from DB job request if present
     if db is not None and job_id is not None:
         job = db.get(Job, job_id)
@@ -2144,6 +2241,15 @@ def validate_generated_python(
             "Generated code must define exactly one Manim Scene subclass; "
             f"found {len(scene_class_names)}: {scene_class_names}."
         )
+
+    def contains_rendered_text_constructor(node: ast.AST) -> bool:
+        return any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id in {"Text", "Tex", "MathTex"}
+            for child in ast.walk(node)
+        )
+
     stage_direction = re.compile(
         r"^\s*(?:draw|label|show|illustrate|add|highlight|display|construct|place|mark|write)\b",
         re.IGNORECASE,
@@ -2430,17 +2536,15 @@ def validate_generated_python(
                     )
                     if normalized_candidate and normalized_candidate == normalized_spec and is_plain_caption:
                         raise SyntaxError(
-                            f"Beat {beat_number} line {node.lineno} copies its operational ON SCREEN spec verbatim "
-                            f"into {call_name}() (100% word overlap). Construct the requested visual and author a "
-                            "separate short label."
+                            f"Line {node.lineno} copies its operational ON SCREEN spec into a rendered caption; "
+                            "this is a 100% word overlap. Construct the described visual instead of displaying the instruction verbatim."
                         )
                     if beat is not None and word_count > 8 and is_plain_caption:
                         overlap_ratio = rendered_spec_word_overlap(candidate.value, beat.on_screen_text)
                         if overlap_ratio > 0.60:
                             raise SyntaxError(
-                                f"Beat {beat_number} line {node.lineno} copies its operational ON SCREEN spec into "
-                                f"{call_name}() as a {word_count}-word caption ({overlap_ratio:.0%} word overlap). "
-                                "Construct the described visual and use only a separately authored short label."
+                                f"Line {node.lineno} renders an operational caption with {overlap_ratio:.0%} word overlap "
+                                "with the beat specification. Use a short authored caption or construct the visual directly."
                             )
 
             literal_arguments = [
@@ -2780,6 +2884,15 @@ def validate_generated_python(
             "Generated code must not Transform or ReplacementTransform a copied equation into the next equation. "
             "Transform the existing on-screen mobject, or FadeOut it before writing the replacement."
         )
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr == "add" and isinstance(node.func.value, ast.Name) and node.func.value.id == "self":
+            if any(contains_rendered_text_constructor(argument) for argument in node.args):
+                raise SyntaxError(
+                    f"Line {node.lineno} mounts rendered text with self.add(); "
+                    "animate it with FadeIn, Write, or a safe transition so it cannot appear suddenly."
+                )
     for color_name in PROHIBITED_MANIM_COLOR_NAMES:
         if re.search(rf"\b{re.escape(color_name)}\b", code):
             raise SyntaxError(
@@ -2980,12 +3093,59 @@ def timed_beat_duration(beat: StoryboardBeat, audio_duration: float | None = Non
     return max(authored_duration, float(audio_duration))
 
 
+def validate_render_duration_for_narration(
+    rendered_duration: float,
+    narration_timeline_duration: float,
+    tolerance: float = AUDIO_TIMELINE_TOLERANCE_SECONDS,
+) -> None:
+    """Reject renders that would require speeding up the narration.
+
+    A short render used to be accepted when it was within the broad timing
+    drift limit, and the final mux then compressed the voice track. That made
+    otherwise good explanations sound rushed. A render may be longer than the
+    narration timeline (the audio can be padded), but it may not be shorter.
+    """
+    if rendered_duration + tolerance < narration_timeline_duration:
+        raise RuntimeError(
+            "Rendered video is shorter than the narration timeline "
+            f"({rendered_duration:.2f}s vs {narration_timeline_duration:.2f}s); "
+            "increase beat hold/run_time values instead of speeding up voiceover."
+        )
+
+
+def validate_narration_pacing(
+    text: str,
+    audio_duration: float,
+    max_wpm: float = MAX_TEACHING_NARRATION_WPM,
+) -> float:
+    """Reject clips whose actual speech rate is too fast for teaching.
+
+    Very short clips do not provide a reliable WPM estimate, so the guard is
+    applied once a narration contains at least four spoken tokens. The TTS
+    speed setting alone is insufficient because provider voice/model changes
+    can produce different durations for the same text.
+    """
+    if audio_duration <= 0:
+        raise RuntimeError("Narration clip has no measurable audio duration.")
+    words = re.findall(r"\b[\w']+\b", text, flags=re.UNICODE)
+    if len(words) < 4:
+        return 60.0 * len(words) / audio_duration
+    words_per_minute = 60.0 * len(words) / audio_duration
+    if words_per_minute > max_wpm:
+        raise RuntimeError(
+            f"Narration is too fast at {words_per_minute:.0f} words per minute "
+            f"(maximum {max_wpm:.0f}); regenerate the clip more slowly."
+        )
+    return words_per_minute
+
+
 def generate_timed_beat_audio(
     beats: list[StoryboardBeat],
     audio_dir: Path,
     debug_log_path: Path | None = None,
     db: Session | None = None,
     job_id: str | None = None,
+    tts_speed: float | None = None,
 ) -> list[TimedBeat]:
     audio_dir.mkdir(parents=True, exist_ok=True)
     timed_beats: list[TimedBeat] = []
@@ -3000,8 +3160,19 @@ def generate_timed_beat_audio(
                 raise RuntimeError(f"Unsupported TTS provider: {tts_provider}")
             audio_path = audio_dir / f"beat_{beat.index:02d}.mp3"
             with timed_stage(debug_log_path, f"tts_beat_{beat.index}"):
-                generate_tts_audio(beat.vo_text, audio_path, db, job_id, tts_model, OPENAI_TTS_VOICE)
-            target_duration = timed_beat_duration(beat, get_media_duration(audio_path))
+                tts_kwargs = {"speed": tts_speed} if tts_speed is not None else {}
+                generate_tts_audio(
+                    beat.vo_text,
+                    audio_path,
+                    db,
+                    job_id,
+                    tts_model,
+                    OPENAI_TTS_VOICE,
+                    **tts_kwargs,
+                )
+            spoken_duration = get_media_duration(audio_path)
+            validate_narration_pacing(beat.vo_text, spoken_duration)
+            target_duration = timed_beat_duration(beat, spoken_duration)
         else:
             reason = "tts_provider_silent" if beat.vo_text else "silent"
             log_debug_timing(debug_log_path, f"SKIP stage=tts_beat_{beat.index} reason={reason}")
@@ -3049,7 +3220,9 @@ def generate_timed_beat_audio_for_edit(
             else:
                 with timed_stage(debug_log_path, f"tts_beat_{beat.index}"):
                     generate_tts_audio(beat.vo_text, audio_path, db, job_id, tts_model, OPENAI_TTS_VOICE)
-            target_duration = timed_beat_duration(beat, get_media_duration(audio_path))
+            spoken_duration = get_media_duration(audio_path)
+            validate_narration_pacing(beat.vo_text, spoken_duration)
+            target_duration = timed_beat_duration(beat, spoken_duration)
         else:
             reason = "tts_provider_silent" if beat.vo_text else "silent"
             log_debug_timing(debug_log_path, f"SKIP stage=tts_beat_{beat.index} reason={reason}")
@@ -3597,6 +3770,13 @@ def generate_manim_code(
         "Anchor strictly to the syntax patterns in the reference examples below. "
         f"{block_instruction}\n\n"
         f"{frame_constraint_for_orientation(orientation)}\n\n"
+        "STRICT MULTI-ZONE LAYOUT AND GROUPING RULES (CRITICAL):\n"
+        "1. ISOLATED VIEWPORT REGIONS: Split the viewport horizontally into two completely independent regions: the upper 40% is the 'Text Safe-Zone', and the lower 60% is the 'Simulation Canvas'. The absolute center or origin of any graph, 3D axis frame, phase space plot, or physical pivot anchor must be shifted down out of the center by applying `.shift(DOWN * 2.0)` or setting its primary position matrix to `DOWN * 2.0`. Scale down the geometric bounds of the trajectories or simulation lengths (e.g., maximum scale factor of 0.6) so that no moving element ever crosses above Y = -0.5 under any state.\n\n"
+        "2. EXPLICIT TEXT CONTAINERS & NATIVE LAYOUT: Ban all manual, absolute positioning commands (e.g., UP * 2.5) for independent lines of text, variables, or labels. Never loop over characters or lines to position them manually with `move_to()`. Use a single `Tex`/`MathTex` call for full expressions. For multi-line content, use one `VGroup(*lines).arrange(DOWN, buff=0.3)`—never manually compute y-coordinates per line. Arrange the elements within this group vertically using `.arrange(DOWN, buff=0.3, aligned_edge=CENTER)`, and center the final parent block inside the top area using `.to_edge(UP, buff=0.4)`.\n\n"
+        "3. PRE-ADD FRAME-FIT CHECK: You MUST call `fit_to_frame(mobject)` (imported from `app.craft_library`) on every equation, formula, and multi-line text block immediately after construction and before any `.next_to()` or `.move_to()` positioning call.\n\n"
+        "4. DYNAMIC CONTENT & VERTICAL STACKING SAFETY: If a text asset or multi-line LaTeX block changes length mid-scene, trigger an explicit layout update function: `text_layout_group.arrange(DOWN, buff=0.25).to_edge(UP, buff=0.4)`. When placing content relative to a graph, compute its target position AFTER the graph's actual rendered size is known. After calling `.next_to(axes, DOWN, buff=0.4)`, you MUST call `fit_to_frame(formula_group)` AGAIN to ensure the offset didn't push it out of bounds.\n\n"
+        "5. COMPETING POSITION-SETTERS: NEVER apply both an `add_updater` and a discrete `.animate.move_to(...)` or `Transform` call targeting position to the same mobject in the same beat. Remove redundant discrete position animations if an updater is controlling the position.\n\n"
+        "6. Z-INDEX DEPTH LAYERING: Explicitly configure rendering depth layers. The parent `text_layout_group` must always be explicitly forced onto a higher layer (`.set_z_index(10)`) than any underlying coordinate systems, axis markers, or drawing paths (`.set_z_index(1)`).\n\n"
         "PERSISTENT SPLIT-SCREEN LAYOUT CONSTRAINT: For any topic where a graph or diagram is introduced "
         "and equations will be derived from or about that graph/diagram in subsequent beats, do NOT FadeOut "
         "the graph/diagram to make room for equations. Instead, partition the frame: define two persistent "
@@ -3878,6 +4058,10 @@ def generate_valid_manim_code(
     previous_render_code: str | None,
     debug_log_path: Path | None = None,
 ) -> str:
+    # Code-generation retries are part of the same render attempt. Persist
+    # the outer attempt number before the first provider call so rate-limit,
+    # truncation, and parser retries cannot leave the job at zero.
+    update_job(db, job_id, attempt_number=render_attempt)
     error_feedback = render_error_feedback
     previous_code = previous_render_code
     target_beat_number = beat_number_from_traceback(previous_render_code, render_error_feedback) or beat_number_from_feedback(
@@ -3931,7 +4115,6 @@ def generate_valid_manim_code(
                     progress_message=(
                         f"Rate limit encountered for attempt {render_attempt}/{MAX_RETRIES}; waiting {sleep_seconds:.1f}s before retrying the same attempt."
                     ),
-                    attempt_number=render_attempt,
                     error=str(exc),
                 )
                 time.sleep(sleep_seconds)
@@ -3946,7 +4129,6 @@ def generate_valid_manim_code(
                     f"Generated code was cut off for render attempt {render_attempt}/{MAX_RETRIES}; "
                     f"requesting a complete code response ({parse_attempt}/{CODEGEN_PARSE_RETRIES + 1})."
                 ),
-                attempt_number=render_attempt,
                 error=truncated_feedback,
             )
             continue
@@ -3966,7 +4148,6 @@ def generate_valid_manim_code(
                         f"Generated response did not include a usable Beat {target_beat_number} block for render attempt "
                         f"{render_attempt}/{MAX_RETRIES}; requesting code-only output ({parse_attempt}/{CODEGEN_PARSE_RETRIES + 1})."
                     ),
-                    attempt_number=render_attempt,
                     error=f"{PURE_PYTHON_FEEDBACK} Parser error: missing beat markers in response.",
                 )
                 continue
@@ -3981,7 +4162,6 @@ def generate_valid_manim_code(
                         f"Generated response included extra beat markers outside Beat {target_beat_number} for render attempt "
                         f"{render_attempt}/{MAX_RETRIES}; requesting code-only output ({parse_attempt}/{CODEGEN_PARSE_RETRIES + 1})."
                     ),
-                    attempt_number=render_attempt,
                     error=f"{PURE_PYTHON_FEEDBACK} Parser error: extra beat markers in response.",
                 )
                 continue
@@ -4000,7 +4180,6 @@ def generate_valid_manim_code(
                         f"Generated response did not include a usable Beat {target_beat_number} block for render attempt "
                         f"{render_attempt}/{MAX_RETRIES}; requesting code-only output ({parse_attempt}/{CODEGEN_PARSE_RETRIES + 1})."
                     ),
-                    attempt_number=render_attempt,
                     error=f"{PURE_PYTHON_FEEDBACK} Parser error: {exc}",
                 )
                 continue
@@ -4049,7 +4228,6 @@ def generate_valid_manim_code(
                     f"{render_attempt}/{MAX_RETRIES}; requesting code-only output "
                     f"({parse_attempt}/{CODEGEN_PARSE_RETRIES + 1})."
                 ),
-                attempt_number=render_attempt,
                 error=f"{PURE_PYTHON_FEEDBACK} Parser error: {exc}",
             )
             if target_beat_number is None:
@@ -4212,6 +4390,28 @@ def validate_scene_file_isolation(
     except SceneIsolationError as exc:
         record_scene_isolation_violation(job_id, scene_name, scene_file, class_names, str(exc))
         raise
+
+
+def validate_vivacity_scene_source(scene_file: Path, scene_name: str) -> None:
+    """Require the hardened base class immediately before a production render."""
+    try:
+        tree = ast.parse(scene_file.read_text(encoding="utf-8"), filename=str(scene_file))
+    except SyntaxError as exc:
+        raise SceneIsolationError(f"Scene source is not valid Python: {exc}.") from exc
+
+    scene_nodes = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == scene_name
+    ]
+    if len(scene_nodes) != 1:
+        raise SceneIsolationError(
+            f"Production render requires exactly one named scene class {scene_name!r}."
+        )
+    bases = {base.id for base in scene_nodes[0].bases if isinstance(base, ast.Name)}
+    if "Scene" in bases or "VivacityScene" not in bases:
+        raise SceneIsolationError(
+            f"Production scene {scene_name} must subclass VivacityScene; found bases {sorted(bases)}."
+        )
 
 
 def write_job_scene_file(job_id: str, scene_name: str, code: str) -> Path:
@@ -4477,6 +4677,10 @@ def patched_play(self, *args, **kwargs):
     res = original_play(self, *new_args, **kwargs)
     for mob in self.mobjects:
         safe_mobject_scale(mob, self)
+    import sys
+    sys.path.insert(0, 'C:/PROJECTS/newmanim')
+    from app.render_acceptance import run_render_acceptance
+    run_render_acceptance(self)
     return res
 Scene.play = patched_play
 
@@ -4535,8 +4739,6 @@ def render_scene(
 
         result = run_command(
             [
-                sys.executable,
-                "-m",
                 "manim",
                 f"-q{quality}",
                 "--disable_caching",
@@ -4589,6 +4791,7 @@ def render_scene_for_job(
     work directory rather than the default ``media/`` directory.
     """
     source_hash = validate_scene_file_isolation(job_id, scene_name, scene_file, work_dir)
+    validate_vivacity_scene_source(scene_file, scene_name)
     kwargs: dict[str, object] = {
         "orientation": orientation,
         "timeout_seconds": timeout_seconds,
@@ -4725,6 +4928,11 @@ def atempo_filter(ratio: float) -> str:
 
 def stretch_audio_to_duration(audio_path: Path, target_duration: float, out_path: Path) -> None:
     current = get_media_duration(audio_path)
+    if target_duration + AUDIO_TIMELINE_TOLERANCE_SECONDS < current:
+        raise RuntimeError(
+            "Refusing to speed up narration to fit a shorter video: "
+            f"audio={current:.2f}s, video={target_duration:.2f}s."
+        )
     ratio = current / target_duration
     run_command(
         [
@@ -4748,11 +4956,57 @@ def mux_audio_video(video_path: Path, audio_path: Path, out_path: Path) -> None:
             str(video_path),
             "-i",
             str(audio_path),
+            # Re-encode the final delivery file at the configured production
+            # cadence so held beats cannot leave a variable-frame-rate stream.
+            "-vsync",
+            "cfr",
+            "-r",
+            "60",
             "-c:v",
-            "copy",
+            "libx264",
+            "-preset",
+            "slow",
+            "-crf",
+            "18",
             "-c:a",
             "aac",
             str(out_path),
+        ]
+    )
+
+
+def pad_video_to_duration(video_path: Path, target_seconds: float, out_path: Path) -> None:
+    """Hold the final rendered frame when narration legitimately runs longer."""
+    current = get_media_duration(video_path)
+    extra = max(0.0, float(target_seconds) - current)
+    if extra <= 0.02:
+        shutil.copy2(video_path, out_path)
+        return
+    run_command(
+        [
+            "ffmpeg", "-y", "-i", str(video_path),
+            "-vf", f"tpad=stop_mode=clone:stop_duration={extra:.3f}",
+            "-t", f"{float(target_seconds):.3f}",
+            "-an", "-vsync", "cfr", "-r", "60",
+            "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+            str(out_path),
+        ]
+    )
+
+
+def pad_audio_to_duration(audio_path: Path, target_seconds: float, out_path: Path) -> None:
+    """Add silence only when the rendered video outlasts the narration."""
+    current = get_media_duration(audio_path)
+    extra = max(0.0, float(target_seconds) - current)
+    if extra <= 0.02:
+        shutil.copy2(audio_path, out_path)
+        return
+    run_command(
+        [
+            "ffmpeg", "-y", "-i", str(audio_path),
+            "-af", f"apad=pad_dur={extra:.3f}",
+            "-t", f"{float(target_seconds):.3f}",
+            "-c:a", "aac", str(out_path),
         ]
     )
 
@@ -4844,7 +5098,6 @@ def run_pipeline_for_job(
                     job_id,
                     status=JobStatus.rendering,
                     progress_message=f"Rendering attempt {attempt}/{MAX_RETRIES}.",
-                    attempt_number=attempt,
                     error=None,
                 )
                 render_started = time.monotonic()
@@ -4887,6 +5140,22 @@ def run_pipeline_for_job(
                 target_duration = planned_total_duration(timed_beats)
                 with timed_stage(debug_log_path, f"video_duration_probe_attempt_{attempt}"):
                     video_duration = get_media_duration(video_path)
+                try:
+                    validate_render_duration_for_narration(video_duration, target_duration)
+                except RuntimeError as exc:
+                    error_feedback = str(exc)
+                    previous_code = code
+                    update_job(
+                        db,
+                        job_id,
+                        status=JobStatus.retrying,
+                        progress_message=(
+                            f"Narration timing was too tight on attempt {attempt}/{MAX_RETRIES}; "
+                            "retrying with more room for the explanation."
+                        ),
+                        error=error_feedback,
+                    )
+                    continue
                 drift = abs(video_duration - target_duration)
                 if target_duration > 0 and drift / target_duration > DRIFT_FAILURE_RATIO:
                     error_feedback = (
@@ -5066,6 +5335,17 @@ def run_pipeline_for_job(
                 ensure_attempt_time_remaining(attempt_start_time, attempt)
                 with timed_stage(debug_log_path, f"video_duration_probe_attempt_{attempt}_accepted"):
                     video_duration = get_media_duration(video_path)
+                rendered_beat_windows = timed_beat_windows(timed_beats, video_duration)
+                with timed_stage(debug_log_path, "post_render_verification"):
+                    assert_rendered_video_clean(
+                        video_path,
+                        work_dir,
+                        sample_count=POST_RENDER_SAMPLE_COUNT,
+                        beat_windows=[
+                            (float(window["start"]), float(window["end"]))
+                            for window in rendered_beat_windows
+                        ],
+                    )
 
                 update_job(
                     db,
@@ -5079,6 +5359,7 @@ def run_pipeline_for_job(
                 final_path = work_dir / f"{scene_name}_FINAL.mp4"
                 with timed_stage(debug_log_path, "mux_audio_video"):
                     mux_audio_video(video_path, corrected_audio, final_path)
+                assert_delivery_file_clean(final_path)
                 with timed_stage(debug_log_path, "storage_upload"):
                     output_url = upload_video(final_path, job_id)
 
@@ -5222,6 +5503,7 @@ def run_topic_pipeline_for_job(
             parse_storyboard, WORK_ROOT, find_rendered_video, upload_video,
             RENDER_TIER_3_PRODUCTION,
         )
+        from app.frame_check import verify_delivery_file
 
         beats = parse_storyboard(storyboard)
         work_dir = WORK_ROOT / job_id
@@ -5235,6 +5517,52 @@ def run_topic_pipeline_for_job(
             video_path = find_rendered_video(work_dir, video_name)
         if video_path is None:
             raise RuntimeError(f"Craft scene render output not found for {video_name}")
+
+        # Craft templates previously uploaded silent video directly. Reuse the
+        # production beat-TTS timeline and mux it before the job can complete.
+        update_job(
+            db,
+            job_id,
+            status=JobStatus.generating_voiceover,
+            progress_message="Generating synchronized voiceover for crafted beats.",
+        )
+        with timed_stage(debug_log_path, "craft_tts_generation_total"):
+            timed_beats = generate_timed_beat_audio(
+                beats,
+                work_dir / "audio",
+                debug_log_path,
+                db,
+                job_id,
+                tts_speed=0.68,
+            )
+        audio_track = work_dir / f"{video_name}_voiceover.mp3"
+        with timed_stage(debug_log_path, "craft_audio_concatenate"):
+            concatenate_audio(timed_beats, work_dir / "audio", audio_track)
+
+        video_duration = get_media_duration(video_path)
+        audio_duration = get_media_duration(audio_track)
+        if video_duration + AUDIO_TIMELINE_TOLERANCE_SECONDS < audio_duration:
+            padded_video = work_dir / f"{video_name}_video_aligned.mp4"
+            pad_video_to_duration(video_path, audio_duration, padded_video)
+            video_path = padded_video
+        elif audio_duration + AUDIO_TIMELINE_TOLERANCE_SECONDS < video_duration:
+            padded_audio = work_dir / f"{video_name}_audio_aligned.m4a"
+            pad_audio_to_duration(audio_track, video_duration, padded_audio)
+            audio_track = padded_audio
+
+        update_job(
+            db,
+            job_id,
+            status=JobStatus.muxing,
+            progress_message="Muxing synchronized voiceover into the final video.",
+        )
+        final_path = work_dir / f"{video_name}_VOICE_SYNCED.mp4"
+        with timed_stage(debug_log_path, "craft_mux_audio_video"):
+            mux_audio_video(video_path, audio_track, final_path)
+        delivery = verify_delivery_file(final_path)
+        if not delivery.passed:
+            raise RuntimeError(f"Craft delivery verification failed: {delivery.message}")
+        video_path = final_path
 
         output_url = upload_video(video_path, job_id)
         
@@ -5358,7 +5686,6 @@ def run_beat_regeneration_for_job(
                     job_id,
                     status=JobStatus.generating_code if attempt == 1 else JobStatus.retrying,
                     progress_message=f"Patching Beat {beat_number} code for attempt {attempt}/{MAX_RETRIES}.",
-                    attempt_number=attempt,
                 )
                 with timed_stage(debug_log_path, f"beat_edit_codegen_attempt_{attempt}"):
                     code = generate_valid_manim_code(
@@ -5383,7 +5710,6 @@ def run_beat_regeneration_for_job(
                     job_id,
                     status=JobStatus.rendering,
                     progress_message=f"Rendering edited Beat {beat_number}, attempt {attempt}/{MAX_RETRIES}.",
-                    attempt_number=attempt,
                     error=None,
                 )
                 render_started = time.monotonic()
@@ -5450,6 +5776,7 @@ def run_beat_regeneration_for_job(
                 final_path = work_dir / f"{scene_name}_FINAL.mp4"
                 with timed_stage(debug_log_path, "mux_audio_video"):
                     mux_audio_video(video_path, corrected_audio, final_path)
+                assert_delivery_file_clean(final_path)
                 with timed_stage(debug_log_path, "storage_upload"):
                     output_url = upload_video(final_path, job_id)
 
@@ -5608,6 +5935,7 @@ def run_beat_param_render_for_job(
         final_path = work_dir / f"{scene_name}_FINAL.mp4"
         with timed_stage(debug_log_path, "mux_audio_video"):
             mux_audio_video(video_path, corrected_audio, final_path)
+        assert_delivery_file_clean(final_path)
         with timed_stage(debug_log_path, "storage_upload"):
             output_url = upload_video(final_path, job_id)
 

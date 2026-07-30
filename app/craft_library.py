@@ -1,6 +1,16 @@
 import os
 from typing import Dict, Any, Optional, List
 import re
+import math
+from typing import Sequence
+
+from vivacity_constants import (
+    BACKGROUND_COLOR,
+    EQUATION_COLOR,
+    PRIMARY_COLOR,
+    SECONDARY_COLOR,
+    MUTED_COLOR,
+)
 
 try:
     from manim import *
@@ -13,15 +23,50 @@ CRAFT_BODY_FONT_SIZE = 36
 CRAFT_EQUATION_FONT_SIZE = 42
 
 # Premium Cinematic Color Palette
-CRAFT_BG_COLOR = "#0e0f12"      # Deep graphite charcoal background
-CRAFT_AXES_COLOR = "#4a4e5a"    # Soft grey for clean coordinate axes
-CRAFT_TEXT_COLOR = "#e0e0e3"    # Warm soft off-white for headers/prose
+CRAFT_BG_COLOR = BACKGROUND_COLOR
+CRAFT_AXES_COLOR = MUTED_COLOR
+CRAFT_TEXT_COLOR = MUTED_COLOR
 
-CRAFT_CURVE_COLOR = "#17dcfc"   # Vibrant cinematic teal (curve/function)
-CRAFT_TANGENT_COLOR = "#ff7c43" # Cinematic coral orange (tangent line)
-CRAFT_DOT_COLOR = "#ff5a5f"     # Vibrant salmon red (points of interest)
-CRAFT_AREA_COLOR = "#ffd43b"    # Soft gold (shaded integral area)
-CRAFT_CIRCLE_COLOR = "#cc99ff"  # Soft amethyst lilac (inscribed circle)
+CRAFT_CURVE_COLOR = EQUATION_COLOR
+CRAFT_TANGENT_COLOR = SECONDARY_COLOR
+CRAFT_DOT_COLOR = PRIMARY_COLOR
+CRAFT_AREA_COLOR = PRIMARY_COLOR
+CRAFT_CIRCLE_COLOR = SECONDARY_COLOR
+
+def get_luminance(hex_color: str) -> float:
+    """Calculate relative luminance of a hex color."""
+    if not isinstance(hex_color, str):
+        from manim.utils.color.core import color_to_rgb
+
+        rgb = color_to_rgb(hex_color)
+        return 0.2126 * float(rgb[0]) + 0.7152 * float(rgb[1]) + 0.0722 * float(rgb[2])
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) == 3:
+        hex_color = ''.join(c + c for c in hex_color)
+    r, g, b = tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+    def adjust(c):
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * adjust(r) + 0.7152 * adjust(g) + 0.0722 * adjust(b)
+
+def ensure_contrast(text_color: str, background_color: str):
+    """Text color must have sufficient luminance difference from background."""
+    lum_bg = get_luminance(background_color)
+    lum_fg = get_luminance(text_color)
+    ratio = (max(lum_fg, lum_bg) + 0.05) / (min(lum_fg, lum_bg) + 0.05)
+    if ratio < 3.0:
+        raise ValueError(f"Contrast ratio {ratio:.2f} too low between text ({text_color}) and bg ({background_color})")
+
+
+
+def fit_to_frame(mobject, max_width_ratio=0.9, max_height_ratio=0.9):
+    """Scale mobject down if it exceeds safe frame bounds. Never scales up."""
+    frame_width = config.frame_width * max_width_ratio
+    frame_height = config.frame_height * max_height_ratio
+    if mobject.width > frame_width:
+        mobject.scale_to_fit_width(frame_width)
+    if mobject.height > frame_height:
+        mobject.scale_to_fit_height(frame_height)
+    return mobject
 
 def wrap_text(text: str, max_chars_per_line: int = 30) -> str:
     words = text.split(" ")
@@ -116,6 +161,7 @@ def clean_latex_string(s: str) -> str:
 def create_mixed_text(text: str, font_size: float, color=None, weight=NORMAL) -> VMobject:
     if color is None:
         color = CRAFT_TEXT_COLOR
+    ensure_contrast(color, CRAFT_BG_COLOR)
     import re
     if not text:
         return VMobject()
@@ -249,6 +295,10 @@ class CraftContext:
     def remove_recursively(self, mob):
         if not mob:
             return
+        # Fixed-in-frame mobjects are tracked separately by Manim. Removing
+        # only from scene.mobjects leaves ghost headings behind on later beats.
+        if hasattr(self.scene, "remove_fixed_in_frame_mobjects"):
+            self.scene.remove_fixed_in_frame_mobjects(mob)
         self.scene.remove(mob)
         if hasattr(mob, "submobjects") and mob.submobjects:
             for sub in mob.submobjects:
@@ -352,7 +402,7 @@ def introduce_concept(ctx: CraftContext, title: str, text: Optional[str] = None)
     
     if text:
         formatted_text = wrap_text(format_title_text(text), max_chars_per_line=18)
-        sub_mob = create_mixed_text(formatted_text, font_size=CRAFT_BODY_FONT_SIZE, color=LIGHT_GREY)
+        sub_mob = create_mixed_text(formatted_text, font_size=CRAFT_BODY_FONT_SIZE, color=CRAFT_TEXT_COLOR)
         group.add(sub_mob)
     
     group.arrange(DOWN, buff=0.6)
@@ -654,3 +704,192 @@ def plot_math_curve_with_tangent_and_area(ctx: CraftContext, heading: Optional[s
 
     ctx.scene.wait(1.5)
 
+
+class LiveHistogram(VGroup):
+    """Histogram whose bar geometry is derived from a live stage tracker."""
+
+    STAGE_COUNTS = (
+        (1, 1, 2, 1, 1, 1),
+        (1, 2, 3, 2, 2, 1),
+        (1, 3, 5, 4, 3, 1),
+        (1, 4, 7, 6, 4, 1),
+    )
+
+    def __init__(self, axes, stage_tracker: ValueTracker):
+        self.axes = axes
+        self.stage_tracker = stage_tracker
+        self._bars = always_redraw(self._build_bars)
+        super().__init__(self._bars)
+
+    def _build_bars(self):
+        stage = min(int(round(self.stage_tracker.get_value())), len(self.STAGE_COUNTS) - 1)
+        bars = VGroup()
+        for center, count in zip((6, 12, 18, 24, 30, 36), self.STAGE_COUNTS[stage]):
+            height = max(0.18, count / 8 * self.axes.y_length)
+            bars.add(
+                Rectangle(
+                    width=self.axes.x_length / 8,
+                    height=height,
+                    stroke_color=CRAFT_CURVE_COLOR,
+                    fill_color=CRAFT_CURVE_COLOR,
+                    fill_opacity=0.58,
+                ).move_to(self.axes.c2p(center, 0) + UP * (height / 2))
+            )
+        return bars
+
+
+def plot_dice_distribution(
+    ctx: CraftContext,
+    heading: Optional[str] = None,
+    dice_rolls: Optional[Sequence[int]] = None,
+):
+    """Show actual dice faces and a histogram that grows toward a bell shape."""
+    ctx.prepare_beat("plot")
+
+    if heading:
+        heading_mob = create_mixed_text(
+            wrap_text(format_title_text(heading), max_chars_per_line=22),
+            font_size=CRAFT_BODY_FONT_SIZE,
+            color=CRAFT_TEXT_COLOR,
+            weight=BOLD,
+        )
+        fit_to_frame(heading_mob, 0.88, 0.12)
+        heading_mob.to_edge(UP, buff=0.35)
+        ctx.add_fixed(heading_mob)
+        ctx.scene.play(FadeIn(heading_mob, shift=UP * 0.12), run_time=0.8)
+        ctx.current_heading = heading_mob
+
+    axes = ctx.graph_elements.get("dice_axes")
+    if axes is None:
+        axes = Axes(
+            x_range=[0, 42, 6],
+            y_range=[0, 8, 2],
+            x_length=4.0 if ctx.orientation == "portrait" else 6.0,
+            y_length=3.0 if ctx.orientation == "portrait" else 3.6,
+            tips=False,
+            axis_config={"color": CRAFT_AXES_COLOR, "stroke_opacity": 0.7},
+        ).move_to(DOWN * (0.7 if ctx.orientation == "portrait" else 0.4))
+        axes.x_axis.add_numbers([6, 12, 18, 24, 30, 36], font_size=18, color=CRAFT_TEXT_COLOR)
+        x_label = Text("sum of dice", font_size=22, color=CRAFT_TEXT_COLOR).next_to(axes, DOWN, buff=0.18)
+        y_label = Text("frequency", font_size=22, color=CRAFT_TEXT_COLOR).rotate(PI / 2).next_to(axes, LEFT, buff=0.18)
+        ctx.scene.play(Create(axes), FadeIn(VGroup(x_label, y_label)), run_time=1.0)
+        ctx.graph_elements["dice_axes"] = axes
+        ctx.graph_elements["dice_axis_labels"] = VGroup(x_label, y_label)
+
+        dice = VGroup()
+        values = tuple(dice_rolls or (3, 5, 2, 4, 6, 1))
+        if len(values) != 6 or any(value not in range(1, 7) for value in values):
+            raise ValueError("dice_rolls must contain exactly six values in the range 1..6")
+        for value in values:
+            die = RoundedRectangle(
+                corner_radius=0.08,
+                width=0.48,
+                height=0.48,
+                stroke_color=CRAFT_AREA_COLOR,
+                fill_color=CRAFT_AREA_COLOR,
+                fill_opacity=0.18,
+            )
+            die_label = Text(str(value), font_size=24, color=CRAFT_AREA_COLOR).move_to(die)
+            dice.add(VGroup(die, die_label))
+        dice.arrange(RIGHT, buff=0.1).move_to(UP * 2.05)
+        dice_caption = Text("one roll of six fair dice", font_size=22, color=CRAFT_TEXT_COLOR).next_to(dice, DOWN, buff=0.12)
+        ctx.scene.play(Create(dice), FadeIn(dice_caption), run_time=1.2)
+        ctx.graph_elements["dice_faces"] = dice
+        ctx.graph_elements["dice_caption"] = dice_caption
+        trial_tracker = ValueTracker(0)
+        trial_label = always_redraw(
+            lambda: MathTex(
+                rf"n={[1, 10, 100, 1000][min(int(round(trial_tracker.get_value())), 3)]}",
+                color=CRAFT_AREA_COLOR,
+                font_size=26,
+            ).move_to(axes.c2p(4, 7.35))
+        )
+        ctx.scene.play(FadeIn(trial_label), run_time=0.5)
+        ctx.graph_elements["trial_tracker"] = trial_tracker
+        ctx.graph_elements["trial_label"] = trial_label
+
+    # Roll each persistent die independently. A staggered local spin and
+    # bounce reads as six dice being thrown, rather than one rigid row rotating.
+    dice = ctx.graph_elements["dice_faces"]
+    roll_animations = []
+    for die in dice:
+        center = die.get_center().copy()
+        die.generate_target()
+        die.target.shift(UP * 0.16)
+        die.target.rotate(PI, about_point=center)
+        first_roll = MoveToTarget(die)
+        die.generate_target()
+        die.target.shift(DOWN * 0.16)
+        die.target.rotate(PI, about_point=center)
+        second_roll = MoveToTarget(die)
+        roll_animations.append(
+            Succession(
+                first_roll,
+                second_roll,
+            )
+        )
+    ctx.scene.play(
+        LaggedStart(*roll_animations, lag_ratio=0.12),
+        run_time=1.8,
+        rate_func=rate_functions.ease_in_out_sine,
+    )
+
+    stage = int(ctx.graph_elements.get("dice_stage", 0))
+    trial_tracker = ctx.graph_elements.get("trial_tracker")
+    if trial_tracker is not None:
+        ctx.scene.play(
+            trial_tracker.animate.set_value((1, 10, 100, 1000)[min(stage, 3)]),
+            run_time=0.7,
+        )
+    stage_tracker = ctx.graph_elements.get("dice_stage_tracker")
+    histogram = ctx.graph_elements.get("dice_histogram")
+    if stage_tracker is None:
+        stage_tracker = ValueTracker(0)
+        histogram = LiveHistogram(axes, stage_tracker)
+        ctx.scene.play(FadeIn(histogram), run_time=1.0)
+        ctx.graph_elements["dice_stage_tracker"] = stage_tracker
+        ctx.graph_elements["dice_histogram"] = histogram
+    else:
+        ctx.scene.play(
+            stage_tracker.animate.set_value(min(stage, 3)),
+            run_time=1.2,
+            rate_func=rate_functions.ease_in_out_sine,
+        )
+    ctx.graph_elements["dice_stage"] = min(stage + 1, 3)
+
+    if "dice_mean_line" not in ctx.graph_elements:
+        mean_line = DashedLine(
+            axes.c2p(21, 0),
+            axes.c2p(21, 7.5),
+            color=CRAFT_AREA_COLOR,
+            dash_length=0.12,
+        )
+        mean_label = MathTex(r"\mu=21", color=CRAFT_AREA_COLOR, font_size=26).move_to(
+            axes.c2p(21, 7.75)
+        )
+        ctx.scene.play(Create(mean_line), FadeIn(mean_label), run_time=0.9)
+        ctx.graph_elements["dice_mean_line"] = mean_line
+        ctx.graph_elements["dice_mean_label"] = mean_label
+
+    if stage >= 1 and "dice_normal_curve" not in ctx.graph_elements:
+        normal_curve = axes.plot(
+            lambda x: 6.8 * math.exp(-0.5 * ((x - 21) / 6.0) ** 2),
+            x_range=[6, 36],
+            color=CRAFT_AREA_COLOR,
+            stroke_width=5,
+        )
+        ctx.scene.play(Create(normal_curve), run_time=1.3)
+        ctx.graph_elements["dice_normal_curve"] = normal_curve
+
+    note = Text(
+        ["one trial", "more trials", "bell shape emerging", "normal-like shape"][min(stage, 3)],
+        font_size=24,
+        color=CRAFT_CURVE_COLOR,
+    ).next_to(axes, UP, buff=0.18)
+    fit_to_frame(note, 0.82, 0.10)
+    ctx.scene.play(FadeIn(note, shift=UP * 0.1), run_time=0.5)
+    ctx.scene.wait(0.8)
+    # Give the slower voiceover room to explain the current distribution while
+    # the histogram remains visible and the scene does not end in a dead hold.
+    ctx.smooth_wait(1.2)
+    ctx.temporary_labels.append(note)

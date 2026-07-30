@@ -1,0 +1,16 @@
+C:\PROJECTS\newmanim\app\llm_provider.py:15: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+LLM provider gemini is capacity-limited; retrying with anthropic.
+LLM provider anthropic is capacity-limited; retrying with gemini.
+Created job 2723293c-431d-463b-9b23-1ee5210fbcb3
+Job status: JobStatus.failed
+Estimated cost: 0.0424904
+Output video URL: None
+Error: All configured LLM providers are temporarily unavailable.

@@ -25,7 +25,9 @@ COPY requirements.txt ./requirements.txt
 RUN python -m pip install --upgrade pip && python -m pip install -r requirements.txt
 
 COPY app ./app
-COPY reference_scenes.py manim.cfg ./
+COPY frontend_reference ./frontend_reference
+COPY vivacity_base_scene.py vivacity_constants.py manim.cfg ./
+COPY scenes/ scenes/
 
 RUN useradd --create-home --uid 10001 vivacity \
     && mkdir -p /app/outputs /var/lib/vivacity/jobs /var/lib/vivacity/cache /var/lib/vivacity/learning \
@@ -33,6 +35,6 @@ RUN useradd --create-home --uid 10001 vivacity \
 
 USER vivacity
 
-EXPOSE 8000
+EXPOSE 8080
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}

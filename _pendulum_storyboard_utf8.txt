@@ -1,0 +1,31 @@
+# Approach: concrete example first, then guided noticing, then formula.
+
+[start-0] ON SCREEN: A simple pendulum showcases a bob swinging from a fixed pivot on a string. | VO: "Let's visualize a simple pendulum with a bob swinging from a fixed pivot on a string."
+
+[0-5] ON SCREEN: The pendulum is in the initial vertical position, with angle θ shown as 0 degrees. | VO: "Here, the pendulum is at rest with the angle theta equal to zero degrees."
+
+[5-10] ON SCREEN: The pendulum swings to the right; the string, tension, gravity, and restoring force vectors are marked clearly. | VO: "As the pendulum swings, notice how the string, tension vector, gravity vector, and restoring force vector change."
+
+[10-15] ON SCREEN: Highlight the tension vector pointing along the string towards the pivot. | VO: "The tension vector always points along the string, towards the pivot."
+
+[15-20] ON SCREEN: Highlight the gravity vector pointing straight down regardless of the swing. | VO: "The gravity vector points straight down, remaining constant."
+
+[20-25] ON SCREEN: Highlight the restoring force vector, which is tangential to the swing direction. | VO: "The restoring force vector is always tangential to the swing, restoring the bob to its lowest point."
+
+[25-30] ON SCREEN: Show the angle label θ dynamically updating as the pendulum swings back and forth. | VO: "Observe how the angle label theta dynamically changes with the pendulum's position."
+
+[30-35] ON SCREEN: The pendulum is at its maximum right swing; θ is shown as, for example, 30 degrees. | VO: "When the pendulum is at its maximum position to the right, the angle is thirty degrees."
+
+[35-40] ON SCREEN: Label stating, "At maximum swing, the restoring force is at its maximum." | VO: "At this maximum swing, the restoring force is also at its maximum, pulling the bob back towards equilibrium."
+
+[40-45] ON SCREEN: Transition to showing a new position; now, the pendulum swings to the left with θ representing -30 degrees. | VO: "Now as the pendulum swings to the left, notice θ changes to negative thirty degrees."
+
+[45-50] ON SCREEN: Label stating, "Despite the angle changing, the principles still hold true!" | VO: "Even though the angle changes, all vector relationships remain consistent."
+
+[50-55] ON SCREEN: Display the label “Pendulum Forces” with summary vectors and angles. | VO: "This means that tension, gravity, and restoring force maintain their directional roles in both swings."
+
+[55-60] ON SCREEN: [RECALL_CHECKPOINT] Pause and try this: a pendulum with a bob that swings to an angle of 45 degrees. | VO: "Pause and try this: consider a pendulum with a bob that swings to an angle of 45 degrees." 
+
+[60-65] ON SCREEN: Reveal solution: When θ = 45°, the restoring force points back towards the pivot as shown. | VO: "At 45 degrees, the restoring force is still tangential, pulling back towards the pivot." 
+
+[65-70] ON SCREEN: Highlight: "This demonstrates the consistent behavior of a simple pendulum!" | VO: "This illustrates the consistent behavior of a simple pendulum during its motion!"

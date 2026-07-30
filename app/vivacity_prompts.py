@@ -8,6 +8,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONSTITUTION_PATH = REPO_ROOT / "vivacity_video_constitution.md"
+MASTER_PROMPT_PATH = REPO_ROOT / "vivacity_master_system_prompt.md"
+_master_prompt_cache: tuple[int, int, str] | None = None
 
 FORBIDDEN_NARRATION_WORDS = ("obviously", "simply", "just", "clearly")
 RECALL_CHECKPOINT_TAG = "[RECALL_CHECKPOINT]"
@@ -18,6 +20,20 @@ def load_video_constitution() -> str:
     if CONSTITUTION_PATH.is_file():
         return CONSTITUTION_PATH.read_text(encoding="utf-8").strip()
     return ""
+
+
+def load_master_system_prompt() -> str:
+    """Load the canonical prompt, rereading it whenever its file changes."""
+    global _master_prompt_cache
+    if not MASTER_PROMPT_PATH.is_file():
+        raise FileNotFoundError(f"Canonical Vivacity prompt is missing: {MASTER_PROMPT_PATH}")
+    stat = MASTER_PROMPT_PATH.stat()
+    cache_key = (stat.st_mtime_ns, stat.st_size)
+    if _master_prompt_cache is not None and _master_prompt_cache[:2] == cache_key:
+        return _master_prompt_cache[2]
+    text = MASTER_PROMPT_PATH.read_text(encoding="utf-8").strip()
+    _master_prompt_cache = (cache_key[0], cache_key[1], text)
+    return text
 
 
 def build_script_generation_system_prompt(
@@ -52,18 +68,27 @@ def build_script_generation_system_prompt(
         "Follow vivacity_video_constitution.md for beat duration (3-8s), sentence length, and layout hints "
         "when writing ON SCREEN specs.\n"
     )
+    master_prompt = load_master_system_prompt()
 
     return (
+        f"{master_prompt}\n\n"
+        "Apply the canonical rules above to this request.\n\n"
         "You are generating a teaching script for a JEE/NEET student.\n"
         f"Topic: {topic}\n"
         f"Exam context: {exam_context}\n"
         f"Weak topic flag: {flagged_as_weak_topic}\n"
         f"Unconfirmed prerequisites: {', '.join(unconfirmed_prerequisites) or 'none'}\n"
         f"{weak_note}\n"
-        "OUTPUT FORMAT: Return ONLY storyboard text. One beat per line:\n"
-        '[start-end] ON SCREEN: ... | VO: "..."\n'
-        "Start with one comment line stating the pedagogical approach, e.g.\n"
-        "# Approach: concrete example first, then guided noticing, then formula.\n"
+        "GEOMETRIC PROOF REQUIREMENT: If the topic contains 'visually prove', 'show geometrically', 'construct', or similar, you MUST plan a visual, shape-building proof. "
+        "For 'sum of first n odd integers', you MUST explicitly describe building an n x n grid of unit squares/dots one L-shaped layer at a time (e.g. 'layer 1 is a single square, layer 2 adds an L-shaped band of 3 squares making a 2x2 block', etc.). "
+        "You MUST include shape words like 'Square', 'Dot grid', 'layer', or 'block' in the ON SCREEN text for these beats.\n"
+        "OUTPUT FORMAT: Return ONLY storyboard text. One beat per line. Example EXACT format:\n"
+        '# Approach: concrete example first, then guided noticing, then formula.\n'
+        '[0-4] ON SCREEN: Show a specific numerical example | VO: "Start with one concrete case."\n'
+        '[4-8] ON SCREEN: Vary one part and observe the pattern | VO: "Notice what changes when we modify a value."\n'
+        'Each line MUST start with [number-number] ON SCREEN: and contain | VO: "text"\n'
+        "The [start-end] numbers are integer seconds. Start at 0.\n"
+        "VO text MUST be inside double quotes.\n"
         f"{constitution_ref}\n"
         "STRUCTURE — follow exactly, in order. Do not skip or reorder steps.\n"
         f"{prereq_block}\n"
@@ -92,6 +117,7 @@ def build_script_generation_system_prompt(
         "- Sentence length: prefer under 20 words.\n"
         f"- Do not use {', '.join(repr(w) for w in FORBIDDEN_NARRATION_WORDS)}.\n"
         "- Preserve the user's exact formulas, numbers, and named terms from the topic request.\n"
+        "- PHYSICS FACT CHECK: Before finalizing any physics narration, verify every causal and directional claim against the actual physics. For a pendulum, tension points along the string toward the pivot, while the tangential restoring-force component points toward the equilibrium position (theta=0), not toward the pivot. Do not conflate these forces.\n"
         "- Each beat 3-8 seconds; total timing approximately the requested duration.\n"
         "- Do not create a render job or output anything except storyboard beats."
     )
@@ -109,6 +135,7 @@ def build_storyboard_format_addon() -> str:
 def build_manim_codegen_addon(*, include_recall_checkpoint: bool = True) -> str:
     """§5 additional Manim codegen requirements fed into legacy/template/craft prompts."""
     constitution = load_video_constitution()
+    master_prompt = load_master_system_prompt()
     recall_block = ""
     if include_recall_checkpoint:
         recall_block = (
@@ -122,6 +149,8 @@ def build_manim_codegen_addon(*, include_recall_checkpoint: bool = True) -> str:
         )
     constitution_block = f"\n\n--- vivacity_video_constitution.md ---\n{constitution}\n--- end constitution ---\n"
     return (
+        f"{master_prompt}\n\n"
+        "Apply the canonical rules above to the generated scene.\n\n"
         "Convert the script into a Manim scene following vivacity_video_constitution.md strictly "
         "(§1 layout, §1.3 swap rule, §2 pacing).\n"
         "CRITICAL CODE RULE: Do not copy the storyboard ON SCREEN descriptions verbatim into Text(), Tex(), or fitted_text() calls. "

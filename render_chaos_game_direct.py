@@ -33,10 +33,11 @@ class ChaosGameSierpinskiAnimation(Scene):
     def construct(self):
         self.camera.background_color = BG_COLOR
 
-        # ── Triangle vertex coordinates (lower 55% workspace) ─────────────────
-        S   = 4.6
+        # ── Triangle vertex coordinates (lower 60% workspace) ─────────────────
+        # Scale down and shift lower to guarantee no element crosses Y = -0.5
+        S   = 3.6
         H   = S * math.sqrt(3) / 2
-        ctr = np.array([0.0, -1.8, 0.0])
+        ctr = np.array([0.0, -3.0, 0.0])
 
         v_A = ctr + np.array([0.0,  2 * H / 3, 0.0])
         v_B = ctr + np.array([-S / 2, -H / 3, 0.0])
@@ -45,24 +46,26 @@ class ChaosGameSierpinskiAnimation(Scene):
         VERT_NAMES  = ["A", "B", "C"]
         VERT_COLORS = [ORANGE_COLOR, TEAL_COLOR, PURPLE_COLOR]
 
-        TITLE_Y   = UP * 3.5
-        RULES_Y   = UP * 2.55
-        COUNTER_Y = UP * 1.65
+        # ── Text Layout Group (Upper 40% Safe Zone) ─────────────────────────
+        text_layout_group = VGroup().set_z_index(10)
 
         # ── Beat 1: Title + Rules (0–6 s) ────────────────────────────────────
-        title = Text("The Chaos Game", font_size=38, color=GOLD_COLOR,
-                     weight=BOLD).move_to(TITLE_Y)
-
+        title = Text("The Chaos Game", font_size=38, color=GOLD_COLOR, weight=BOLD)
         rule_lines = VGroup(
             Text("Rule:", font_size=22, color=ORANGE_COLOR, weight=BOLD),
             Text("Pick a random vertex, move halfway,", font_size=19, color=CREAM_COLOR),
             Text("mark the midpoint. Repeat.", font_size=19, color=CREAM_COLOR),
-        ).arrange(DOWN, buff=0.18).move_to(RULES_Y)
-
+        ).arrange(DOWN, buff=0.18)
         step_counter = VGroup(
             Text("Step:", font_size=20, color=DIM_WHITE),
             Text("0", font_size=26, color=TEAL_COLOR, weight=BOLD),
-        ).arrange(RIGHT, buff=0.2).move_to(COUNTER_Y)
+        ).arrange(RIGHT, buff=0.2)
+
+        text_layout_group = VGroup(title, rule_lines, step_counter)
+        text_layout_group.arrange(DOWN, buff=0.3).to_edge(UP, buff=0.4).set_z_index(10)
+        
+        if text_layout_group.width > config.frame_width - 1.5:
+            text_layout_group.scale_to_fit_width(config.frame_width - 1.5)
 
         self.play(FadeIn(title, shift=DOWN * 0.3), run_time=1.2)
         self.play(FadeIn(rule_lines, shift=UP * 0.2), run_time=1.2)
@@ -70,9 +73,10 @@ class ChaosGameSierpinskiAnimation(Scene):
         self.wait(2.8)
 
         # ── Beat 2: Triangle + Vertex Labels (6–14 s) ────────────────────────
+        # All geometric objects are placed on z_index 1
         triangle = Polygon(v_A, v_B, v_C,
                            color=DIM_WHITE, stroke_width=2.5,
-                           fill_color=BG_COLOR, fill_opacity=1.0)
+                           fill_color=BG_COLOR, fill_opacity=1.0).set_z_index(1)
         self.play(Create(triangle), run_time=1.8)
 
         label_offsets = [
@@ -82,7 +86,7 @@ class ChaosGameSierpinskiAnimation(Scene):
         ]
         vert_label_objs = []
         for vpos, vname, vcol, loff in zip(VERTS, VERT_NAMES, VERT_COLORS, label_offsets):
-            lbl = Text(vname, font_size=28, color=vcol, weight=BOLD).move_to(vpos + loff)
+            lbl = Text(vname, font_size=28, color=vcol, weight=BOLD).move_to(vpos + loff).set_z_index(1)
             vert_label_objs.append(lbl)
         self.play(*[FadeIn(l, scale=1.3) for l in vert_label_objs], run_time=1.0)
 
@@ -92,7 +96,7 @@ class ChaosGameSierpinskiAnimation(Scene):
         r1, r2 = sorted([random.random(), random.random()])
         start_pt = r1 * v_A + (r2 - r1) * v_B + (1 - r2) * v_C
 
-        current_dot = Dot(start_pt, radius=0.1, color=RED_COLOR)
+        current_dot = Dot(start_pt, radius=0.1, color=RED_COLOR).set_z_index(1)
         self.play(FadeIn(current_dot, scale=2.0), run_time=0.8)
         self.wait(1.5)
 
@@ -108,17 +112,17 @@ class ChaosGameSierpinskiAnimation(Scene):
             mid_pos     = (current_pos + chosen_pos) / 2.0
 
             highlight  = Circle(radius=0.25, color=chosen_col,
-                                stroke_width=3).move_to(chosen_pos)
+                                stroke_width=3).move_to(chosen_pos).set_z_index(1)
             chosen_tag = Text(f"vertex {chosen_name}", font_size=18,
-                              color=chosen_col).next_to(highlight, RIGHT, buff=0.15)
+                              color=chosen_col).next_to(highlight, RIGHT, buff=0.15).set_z_index(1)
             self.play(Create(highlight), FadeIn(chosen_tag), run_time=0.4)
 
             guide = DashedLine(current_pos, chosen_pos,
                                dash_length=0.12, color=chosen_col,
-                               stroke_width=1.5, stroke_opacity=0.55)
+                               stroke_width=1.5, stroke_opacity=0.55).set_z_index(1)
             self.play(Create(guide), run_time=0.45)
 
-            new_dot = Dot(mid_pos, radius=0.09, color=DOT_COLOR)
+            new_dot = Dot(mid_pos, radius=0.09, color=DOT_COLOR).set_z_index(1)
             self.play(FadeIn(new_dot, scale=1.8), run_time=0.35)
 
             self.play(
@@ -133,8 +137,9 @@ class ChaosGameSierpinskiAnimation(Scene):
             new_counter = VGroup(
                 Text("Step:", font_size=20, color=DIM_WHITE),
                 Text(str(step_num), font_size=26, color=TEAL_COLOR, weight=BOLD),
-            ).arrange(RIGHT, buff=0.2).move_to(COUNTER_Y)
+            ).arrange(RIGHT, buff=0.2).move_to(step_counter.get_center()).set_z_index(10)
             self.play(Transform(step_counter, new_counter), run_time=0.25)
+            step_counter = new_counter
 
             current_pos = mid_pos
             self.wait(0.3)
@@ -143,8 +148,21 @@ class ChaosGameSierpinskiAnimation(Scene):
         accel_label = VGroup(
             Text("Accelerating...", font_size=22, color=ORANGE_COLOR, weight=BOLD),
             Text("Same rule, hundreds of points.", font_size=19, color=CREAM_COLOR),
-        ).arrange(DOWN, buff=0.22).move_to(RULES_Y)
-        self.play(Transform(rule_lines, accel_label), run_time=0.8)
+        ).arrange(DOWN, buff=0.22)
+        
+        # Explicit recalculation of the parent text layout
+        text_layout_group = VGroup(title, accel_label, step_counter)
+        text_layout_group.arrange(DOWN, buff=0.25).to_edge(UP, buff=0.4).set_z_index(10)
+        if text_layout_group.width > config.frame_width - 1.5:
+            text_layout_group.scale_to_fit_width(config.frame_width - 1.5)
+
+        self.play(
+            title.animate.move_to(text_layout_group[0]),
+            Transform(rule_lines, text_layout_group[1]),
+            step_counter.animate.move_to(text_layout_group[2]),
+            run_time=0.8
+        )
+        rule_lines = text_layout_group[1]
 
         all_pts = []
         p = current_pos.copy()
@@ -160,16 +178,16 @@ class ChaosGameSierpinskiAnimation(Scene):
         ]
         for (si, ei, pause, drad) in batch_specs:
             for idx_p in range(si, ei):
-                dot = Dot(all_pts[idx_p], radius=drad, color=DOT_COLOR, fill_opacity=0.85)
+                dot = Dot(all_pts[idx_p], radius=drad, color=DOT_COLOR, fill_opacity=0.85).set_z_index(1)
                 self.add(dot)
                 step_num += 1
                 if step_num % 25 == 0:
                     new_c = VGroup(
                         Text("Step:", font_size=20, color=DIM_WHITE),
                         Text(str(step_num), font_size=26, color=TEAL_COLOR, weight=BOLD),
-                    ).arrange(RIGHT, buff=0.2).move_to(COUNTER_Y)
+                    ).arrange(RIGHT, buff=0.2).move_to(step_counter.get_center()).set_z_index(10)
                     self.remove(step_counter)
-                    step_counter.become(new_c)
+                    step_counter = new_c
                     self.add(step_counter)
                 self.wait(pause)
 
@@ -187,12 +205,19 @@ class ChaosGameSierpinskiAnimation(Scene):
         top_block = VGroup(
             VGroup(fractal_title, fractal_sub).arrange(DOWN, buff=0.22),
             VGroup(formula_label, formula_tex).arrange(DOWN, buff=0.18),
-        ).arrange(DOWN, buff=0.38).move_to(UP * 2.2)
+        )
+
+        text_layout_group = VGroup(top_block)
+        text_layout_group.arrange(DOWN, buff=0.38).to_edge(UP, buff=0.4).set_z_index(10)
+        
+        if text_layout_group.width > config.frame_width - 1.5:
+            text_layout_group.scale_to_fit_width(config.frame_width - 1.5)
 
         self.play(
+            FadeOut(title),
             FadeOut(rule_lines),
             FadeOut(step_counter),
-            FadeIn(top_block, shift=UP * 0.2),
+            FadeIn(text_layout_group, shift=UP * 0.2),
             run_time=1.2,
         )
         self.wait(10.0)
@@ -203,7 +228,7 @@ class ChaosGameSierpinskiAnimation(Scene):
         mid_AC = (v_A + v_C) / 2.0
         inner_tri = Polygon(mid_AB, mid_BC, mid_AC,
                             color=RED_COLOR, stroke_width=2.5,
-                            fill_color=RED_COLOR, fill_opacity=0.18)
+                            fill_color=RED_COLOR, fill_opacity=0.18).set_z_index(1)
 
         # ── Entire recall block as one VGroup — zero static Y overlap ─────────
         recall_q    = Text("Pause and Think:", font_size=26,
@@ -212,16 +237,21 @@ class ChaosGameSierpinskiAnimation(Scene):
                            color=CREAM_COLOR)
         recall_hint = Text("Hint: look at the highlighted triangle.",
                            font_size=18, color=DIM_WHITE)
-        recall_grp  = VGroup(recall_q, recall_body, recall_hint).arrange(
-            DOWN, buff=0.28
-        ).move_to(UP * 2.7)
+        recall_grp  = VGroup(recall_q, recall_body, recall_hint)
+        
+        text_layout_group_new = VGroup(recall_grp)
+        text_layout_group_new.arrange(DOWN, buff=0.28).to_edge(UP, buff=0.4).set_z_index(10)
+
+        if text_layout_group_new.width > config.frame_width - 1.5:
+            text_layout_group_new.scale_to_fit_width(config.frame_width - 1.5)
 
         self.play(
-            FadeOut(top_block),
+            FadeOut(text_layout_group),
             FadeIn(inner_tri),
-            FadeIn(recall_grp, shift=UP * 0.2),
+            FadeIn(text_layout_group_new, shift=UP * 0.2),
             run_time=1.2,
         )
+        text_layout_group = text_layout_group_new
 
         for _ in range(2):
             self.play(inner_tri.animate.set_fill(opacity=0.40), run_time=0.7)
@@ -232,12 +262,16 @@ class ChaosGameSierpinskiAnimation(Scene):
                         color=CREAM_COLOR)
         ans_body2 = Text("triangle — it is the Sierpinski void.", font_size=18,
                          color=CREAM_COLOR)
-        ans_grp  = VGroup(ans_hdr, ans_body, ans_body2).arrange(
-            DOWN, buff=0.25
-        ).move_to(UP * 2.7)
+        ans_grp  = VGroup(ans_hdr, ans_body, ans_body2)
+        
+        text_layout_group_ans = VGroup(ans_grp)
+        text_layout_group_ans.arrange(DOWN, buff=0.25).to_edge(UP, buff=0.4).set_z_index(10)
+        
+        if text_layout_group_ans.width > config.frame_width - 1.5:
+            text_layout_group_ans.scale_to_fit_width(config.frame_width - 1.5)
 
         self.wait(2.0)
-        self.play(Transform(recall_grp, ans_grp), run_time=1.0)
+        self.play(Transform(text_layout_group, text_layout_group_ans), run_time=1.0)
         self.wait(4.5)
 """
 

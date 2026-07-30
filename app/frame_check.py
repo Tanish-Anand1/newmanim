@@ -1,10 +1,13 @@
 import math
+import json
 import subprocess
 from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
 from typing import Sequence
 
 from PIL import Image
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -26,6 +29,111 @@ class SparseFrameFinding:
     timestamp: float
     frame_path: Path
     foreground_pixel_ratio: float
+
+
+@dataclass(frozen=True)
+class TemporalCutFinding:
+    timestamp: float
+    mean_frame_delta: float
+
+
+@dataclass(frozen=True)
+class RenderVerification:
+    overflow: list[OverflowFinding]
+    text_overlap: list[TextOverlapFinding]
+    sparse: list[SparseFrameFinding]
+    temporal_cuts: list[TemporalCutFinding] = field(default_factory=list)
+
+    @property
+    def passed(self) -> bool:
+        return not (self.overflow or self.text_overlap or self.sparse or self.temporal_cuts)
+
+    def failure_summary(self) -> str:
+        parts: list[str] = []
+        if self.overflow:
+            parts.append(f"frame overflow at {self.overflow[0].timestamp:.2f}s")
+        if self.text_overlap:
+            parts.append(f"text/element overlap at {self.text_overlap[0].timestamp:.2f}s")
+        if self.sparse:
+            parts.append(f"nearly empty frame at {self.sparse[0].timestamp:.2f}s")
+        if self.temporal_cuts:
+            parts.append(f"abrupt frame transition at {self.temporal_cuts[0].timestamp:.2f}s")
+        return "; ".join(parts) or "passed"
+
+
+@dataclass(frozen=True)
+class DeliveryVerification:
+    passed: bool
+    message: str
+    video_fps: float | None = None
+    audio_duration: float | None = None
+    video_duration: float | None = None
+
+
+def _parse_rate(value: str | None) -> float | None:
+    if not value or value in {"0/0", "N/A"}:
+        return None
+    if "/" in value:
+        numerator, denominator = value.split("/", 1)
+        denominator_value = float(denominator)
+        return float(numerator) / denominator_value if denominator_value else None
+    return float(value)
+
+
+def verify_delivery_file(
+    media_path: Path,
+    min_fps: float = 45.0,
+    max_fps: float = 60.0,
+    duration_tolerance: float = 0.15,
+) -> DeliveryVerification:
+    """Validate the final muxed file's cadence and audio/video alignment."""
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-of", "json",
+            "-show_entries", "stream=codec_type,r_frame_rate,avg_frame_rate,duration",
+            str(media_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    streams = json.loads(result.stdout).get("streams", [])
+    video = next((stream for stream in streams if stream.get("codec_type") == "video"), None)
+    audio = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
+    if video is None:
+        return DeliveryVerification(False, "missing video stream")
+
+    frame_rate = _parse_rate(video.get("r_frame_rate"))
+    average_rate = _parse_rate(video.get("avg_frame_rate"))
+    video_duration = float(video["duration"]) if video.get("duration") else None
+    if frame_rate is None or average_rate is None:
+        return DeliveryVerification(False, "missing video frame-rate metadata", frame_rate, None, video_duration)
+    if frame_rate < min_fps or frame_rate > max_fps:
+        return DeliveryVerification(False, f"video frame rate {frame_rate:.3f} is outside {min_fps:.0f}-{max_fps:.0f} fps", frame_rate, None, video_duration)
+    if abs(frame_rate - average_rate) > 0.01:
+        return DeliveryVerification(False, f"variable frame rate detected ({frame_rate:.3f} vs {average_rate:.3f})", frame_rate, None, video_duration)
+    if audio is None:
+        return DeliveryVerification(False, "missing audio stream", frame_rate, None, video_duration)
+
+    audio_duration = float(audio["duration"]) if audio.get("duration") else None
+    if video_duration is None or audio_duration is None:
+        return DeliveryVerification(False, "missing audio/video duration metadata", frame_rate, audio_duration, video_duration)
+    if abs(video_duration - audio_duration) > duration_tolerance:
+        return DeliveryVerification(
+            False,
+            f"audio/video duration mismatch ({audio_duration:.3f}s vs {video_duration:.3f}s)",
+            frame_rate,
+            audio_duration,
+            video_duration,
+        )
+    return DeliveryVerification(True, "passed", frame_rate, audio_duration, video_duration)
+
+
+def assert_delivery_file_clean(media_path: Path) -> DeliveryVerification:
+    report = verify_delivery_file(media_path)
+    if not report.passed:
+        raise RuntimeError(f"Final delivery verification failed: {report.message}")
+    return report
 
 
 def get_media_duration(media_path: Path) -> float:
@@ -50,7 +158,7 @@ def get_media_duration(media_path: Path) -> float:
 def sample_timestamps(duration: float, sample_count: int = 8) -> list[float]:
     if duration <= 0:
         return []
-    count = max(5, min(sample_count, 8))
+    count = max(5, min(sample_count, 120))
     if duration < count:
         count = max(1, math.floor(duration))
     return [duration * (i + 1) / (count + 1) for i in range(count)]
@@ -158,7 +266,7 @@ def extract_frames_at_timestamps(
 def border_content_ratio(
     frame_path: Path,
     border_fraction: float = 0.02,
-    background_rgb: tuple[int, int, int] = (0, 0, 0),
+    background_rgb: tuple[int, int, int] | None = None,
     channel_tolerance: int = 24,
 ) -> float:
     border_width = 2
@@ -166,6 +274,9 @@ def border_content_ratio(
         rgb = image.convert("RGB")
         width, height = rgb.size
         pixels = rgb.load()
+        # Scenes may use a non-black background. Use a corner sample as the
+        # local background unless a caller supplies an explicit color.
+        background_rgb = background_rgb or pixels[0, 0]
         
         # Scan top and bottom borders
         for y in list(range(border_width)) + list(range(height - border_width, height)):
@@ -459,3 +570,98 @@ def detect_text_overlap(
         else:
             consecutive_hits = 0
     return findings
+
+
+def detect_temporal_cuts(
+    video_path: Path,
+    sample_fps: int = 12,
+    threshold: float = 0.28,
+) -> list[TemporalCutFinding]:
+    """Detect unusually large adjacent-frame changes at a low-cost preview size.
+
+    Normal drawing, transforms, and fades change gradually. A hard cut or an
+    inserted blank frame produces a much larger normalized pixel delta. The
+    conservative threshold is intentionally limited to severe discontinuities.
+    """
+    probe = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-of", "json",
+            "-show_entries", "stream=width,height,duration",
+            str(video_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    streams = json.loads(probe.stdout).get("streams", [])
+    video = next((stream for stream in streams if stream.get("width") and stream.get("height")), None)
+    if video is None:
+        return []
+    source_width = int(video["width"])
+    source_height = int(video["height"])
+    width = 160
+    height = max(2, int(round(source_height * width / source_width)))
+    decoded = subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-i", str(video_path),
+            "-vf", f"fps={sample_fps},scale={width}:{height},format=gray",
+            "-f", "rawvideo", "-",
+        ],
+        capture_output=True,
+        check=True,
+    ).stdout
+    frame_bytes = width * height
+    frame_count = len(decoded) // frame_bytes
+    if frame_count < 2:
+        return []
+    frames = np.frombuffer(decoded[: frame_count * frame_bytes], dtype=np.uint8)
+    frames = frames.reshape((frame_count, height, width)).astype(np.float32)
+    deltas = np.abs(frames[1:] - frames[:-1]).mean(axis=(1, 2)) / 255.0
+    duration = float(video.get("duration") or 0.0)
+    findings: list[TemporalCutFinding] = []
+    for index, delta in enumerate(deltas, start=1):
+        if float(delta) >= threshold:
+            timestamp = min(duration, index / sample_fps)
+            findings.append(TemporalCutFinding(timestamp, float(delta)))
+    return findings
+
+
+def verify_rendered_video(
+    video_path: Path,
+    work_dir: Path,
+    sample_count: int = 8,
+    beat_windows: Sequence[tuple[float, float]] | None = None,
+) -> RenderVerification:
+    """Run the cheap post-render gates before audio mux/upload.
+
+    The checks deliberately inspect extracted frames rather than generated
+    source code: clipping and collisions are geometric properties of the
+    rendered output and can only be trusted after rasterization.
+    """
+    overflow = detect_frame_overflow(video_path, work_dir / "overflow_samples", sample_count)
+    text_overlap = detect_text_overlap(video_path, work_dir / "overlap_samples", sample_count)
+    sparse = detect_sparse_frames(
+        video_path,
+        work_dir / "sparse_samples",
+        sample_count,
+        beat_windows=beat_windows,
+    )
+    temporal_cuts = detect_temporal_cuts(video_path)
+    return RenderVerification(
+        overflow=overflow,
+        text_overlap=text_overlap,
+        sparse=sparse,
+        temporal_cuts=temporal_cuts,
+    )
+
+
+def assert_rendered_video_clean(
+    video_path: Path,
+    work_dir: Path,
+    sample_count: int = 8,
+    beat_windows: Sequence[tuple[float, float]] | None = None,
+) -> RenderVerification:
+    report = verify_rendered_video(video_path, work_dir, sample_count, beat_windows)
+    if not report.passed:
+        raise RuntimeError(f"Post-render verification failed: {report.failure_summary()}")
+    return report

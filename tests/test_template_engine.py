@@ -1075,8 +1075,8 @@ def test_compile_template_scene_clears_previous_beat_before_next_text():
 
     assert "beat2_entry_anims.append(FadeOut(beat1_diagram" not in code
     beat1_block = code.split("# --- Beat 1 ---", 1)[1].split("# --- Beat 2 params ---", 1)[0]
-    assert "self.play(FadeOut(beat1_diagram" in beat1_block
-    assert beat1_block.rstrip().endswith("run_time=0.4800)")
+    assert "self.play(FadeOut(beat1_heading), FadeOut(beat1_items), FadeOut(beat1_visual)" in beat1_block
+    assert "self.remove(beat1_heading, beat1_items, beat1_visual)" in beat1_block
     storyboard = (
         '[0-4] ON SCREEN: Plot the function | VO: "Start with the function graph"\n'
         '[4-8] ON SCREEN: Show the polynomial | VO: "Replace it with the polynomial"'
@@ -1110,9 +1110,9 @@ def test_compile_template_scene_hands_off_repeated_diagrams_without_a_black_rese
     beat1_block = code.split("# --- Beat 1 ---", 1)[1].split("# --- Beat 2 params ---", 1)[0]
     beat2_block = code.split("# --- Beat 2 ---", 1)[1]
     assert "visual_handoff_from_previous=True" in beat2_block
-    assert "ReplacementTransform(beat1_visual, beat2_visual), run_time=1.2800" in beat2_block
+    assert "safe_visual_transform(beat1_visual, beat2_visual, zone='anchor', run_time=1.2800)" in beat2_block
     assert "animate_visual(self, 'atwood', beat2_visual" not in beat2_block
-    assert "FadeOut(VGroup(beat1_heading, beat1_items)" in beat1_block
+    assert "FadeOut(beat1_heading), FadeOut(beat1_items)" in beat1_block
     assert "FadeOut(beat1_diagram" not in beat1_block
     validate_generated_python(code, "[0-4] ON SCREEN: Atwood machine | VO: \"Identify the two masses.\"")
 
@@ -1135,7 +1135,7 @@ def test_graph_titles_can_fade_while_an_axes_visual_hands_off_to_the_next_beat()
         plan,
     )
 
-    assert "ReplacementTransform(beat1_visual, beat2_visual)" in code
+    assert "safe_visual_transform(beat1_visual, beat2_visual" in code
     validate_generated_python(code)
 
 
@@ -1406,7 +1406,7 @@ def test_heuristic_atwood_plan_constructs_diagram_instead_of_rendering_instructi
     assert plan.beats[0].visual_kind == "atwood"
     assert plan.beats[0].heading == "Atwood machine forces"
     assert "if kind == 'atwood':" in code
-    assert "Circle(radius=0.55" in code
+    assert "Circle(radius=0.40" in code
     assert "Square(side_length=0.68" in code
     assert "Arrow(left_mass" in code
     assert "Draw a pulley with m1 and m2" not in code

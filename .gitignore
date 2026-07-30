@@ -42,3 +42,4 @@ runtime_logs/
 logs/
 learning_memory/
 data/
+_*_render/

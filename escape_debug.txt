@@ -1,0 +1,157 @@
+[07/27/26 17:59:36] INFO     Animation 0 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             1237075862_2888952525_2231324                     
+                             57)                                               
+
+Animation 0: FadeIn(Text('Spacecraft is launched from surface planet')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                                              
+[07/27/26 17:59:37] INFO     Animation 1 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1535101825_88962141                     
+                             )                                                 
+                    INFO     Animation 2 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1653287818_25660861                     
+                             23)                                               
+
+Animation 2: FadeOut(Text('Spacecraft is launched from surface planet')), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                                                     
+[07/27/26 17:59:38] INFO     Animation 3 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_3136467071_32330199                     
+                             13)                                               
+
+Animation 3: FadeIn(Text('Bond vectors')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                
+                    INFO     Animation 4 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_2889870679_29261462                     
+                             21)                                               
+
+Animation 4: FadeIn(Dot), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                     
+                    INFO     Animation 5 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_558675750_223989283                     
+                             0)                                                
+                    INFO     Animation 6 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_2577411214_28533094                     
+                             17)                                               
+
+Animation 6: FadeOut(Text('Bond vectors')), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                       
+[07/27/26 17:59:39] INFO     Animation 7 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_3242011971_42843486                     
+                             37)                                               
+
+Animation 7: FadeIn(Text('Key equation')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                
+                    INFO     Animation 8 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_3451018857_26790208                     
+                             3)                                                
+
+Animation 8: FadeIn(MathTex('KE = \\frac{1}{2} mv^2')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                             
+[07/27/26 17:59:40] INFO     Animation 9 : Using cached    cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_3741843023_61075549                     
+                             2)                                                
+
+Animation 9: FadeIn(MathTex('PE = -\\frac{GMm}{R}')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                           
+                    INFO     Animation 10 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_97449983_1475676216                     
+                             )                                                 
+[07/27/26 17:59:41] INFO     Animation 11 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_908955160_264361327                     
+                             6)                                                
+
+Animation 11: FadeOut(Text('Key equation')), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                        
+[07/27/26 17:59:42] INFO     Animation 12 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1466774074_20362267                     
+                             7)                                                
+
+Animation 12: FadeIn(Text('Graph or comparison shows how they')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                                       
+                    INFO     Animation 13 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1951503046_40851340                     
+                             84)                                               
+
+Animation 13: Create(Axes of 2 submobjects), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                        
+[07/27/26 17:59:43] INFO     Animation 14 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_3102195218_24348669                     
+                             49)                                               
+
+Animation 14: MoveAlongPath(Dot):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                       
+                    INFO     Animation 15 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_2198907143_39764111                     
+                             17)                                               
+[07/27/26 17:59:44] INFO     Animation 16 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1590787763_74248875                     
+                             4)                                                
+
+Animation 16: FadeOut(Text('Graph or comparison shows how they')), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                                              
+                    INFO     Animation 17 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_3136467071_24731857                     
+                             62)                                               
+
+Animation 17: FadeIn(Text('Bond vectors')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                 
+                    INFO     Animation 18 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_2889870679_33362742                     
+                             72)                                               
+
+Animation 18: FadeIn(Dot), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                      
+[07/27/26 17:59:45] INFO     Animation 19 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1498177363_32343567                     
+                             40)                                               
+                    INFO     Animation 20 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_978834154_353348552                     
+                             3)                                                
+
+Animation 20: FadeOut(Text('Bond vectors')), etc.:   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                        
+                    INFO     Animation 21 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_2678981413_20526510                     
+                             28)                                               
+
+Animation 21: FadeIn(Text('Bond vectors')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                 
+[07/27/26 17:59:46] INFO     Animation 22 : Using cached   cairo_renderer.py:94
+                             data (hash :                                      
+                             790754152_1521337906_33284206                     
+                             42)                                               
+
+Animation 22: FadeIn(MathTex('F_g = \\frac{GMm}{R^2}')):   0%|          | 0/1 [00:00<?, ?it/s]
+                                                                                              
+OVERLAP_PLAY 23 Text('Bond vectors') 1521974501280 [0.0, 1.8309178543547762, 0.0] MathTex('F_g = \\frac{GMm}{R^2}') 1521972947488 [0.0, 1.4677987634520056, 0.0]
+Traceback (most recent call last):
+  File "<stdin>", line 18, in <module>
+  File "C:\PROJECTS\newmanim\manim-env\Lib\site-packages\manim\scene\scene.py", line 259, in render
+    self.construct()
+  File "C:\PROJECTS\vivacity_job_runs\990bb9ec-5708-4b46-9b8b-ceafdc94d86b\VivacityGeneratedScene.py", line 629, in construct
+    self.play(FadeIn(beat6_equation1), run_time=0.9500)
+  File "C:\PROJECTS\vivacity_job_runs\990bb9ec-5708-4b46-9b8b-ceafdc94d86b\VivacityGeneratedScene.py", line 258, in patched_play
+    run_render_acceptance(self)
+  File "<stdin>", line 14, in debug
+RuntimeError: debug stop

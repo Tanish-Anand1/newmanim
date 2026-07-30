@@ -1,0 +1,91 @@
+# Vivacity — Render Blueprint
+# Deploy with: One-click from Render dashboard or `render blueprint deploy`
+
+services:
+  # ─── API + Frontend (Web Service) ─────────────────────────────────────
+  - type: web
+    name: vivacity-api
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/vivacity
+    plan: starter
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vivacity-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vivacity-redis
+          property: connectionString
+      - key: JOB_EXECUTION_MODE
+        value: rq
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: TTS_PROVIDER
+        value: silent
+      - key: SUPABASE_URL
+        sync: false  # set in Render dashboard
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: vivacity_videos
+      - key: REVENUECAT_API_KEY
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://vivacity-five.vercel.app,https://vivacity.vercel.app
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: RENDER_COMPUTE_USD_PER_HOUR
+        value: 0.10
+    healthCheckPath: /health/live
+    autoDeploy: true
+
+  # ─── Background Worker ────────────────────────────────────────────────
+  - type: worker
+    name: vivacity-worker
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/vivacity
+    plan: starter
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    command: python -m app.rq_worker
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vivacity-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vivacity-redis
+          property: connectionString
+      - key: JOB_EXECUTION_MODE
+        value: rq
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: TTS_PROVIDER
+        value: silent
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: vivacity_videos
+
+databases:
+  - name: vivacity-db
+    plan: starter
+    region: singapore
+    databaseName: vivacity
+    user: vivacity
+
+redis:
+  - name: vivacity-redis
+    plan: starter
+    region: singapore
+    maxmemoryPolicy: noeviction
